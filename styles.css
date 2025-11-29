@@ -1,0 +1,81 @@
+window, * { 
+  color: white;
+  font-family: "Nimbus Sans"; 
+}
+
+.background {background-color: black;}
+
+button {
+  border-width: 0;
+  padding: 0;
+  background-image: none;
+  background-color: transparent;
+  transition-property: none;
+  animation: none;
+}
+
+button:hover {
+  border-width: 0;
+  background-image: none;
+  background-color: transparent; 
+  box-shadow: none; 
+}
+
+button:active {
+  border-width: 0;
+  background-image: none;
+  background-color: transparent;
+  box-shadow: none;
+}
+
+.heading-style {
+  font-size: 42pt;
+  font-weight: bold;
+}
+
+.header-footer-style {
+  min-height: 120px;
+}
+
+/* used by display_string */
+.information-style {
+  font-size: 24pt;
+  min-height: 802px;
+}
+
+.radio-item-title-style {
+  font-size: 16pt;
+  margin-top: 10px;
+}
+
+.photo-path-style {
+  font-size: 12pt;
+  margin-top: 20px;
+  margin-bottom: 20px;
+  min-width: 100px;
+}
+
+.photo-image-style {
+  min-height: 745px;            /* also in prepare_photo */
+}
+
+scrolledwindow {
+  margin-left: 30px;
+  margin-right: 30px;
+}
+
+.outlined-box {
+  /* REQUIRED: Set a background color. GTK often won't draw a border unless a background is set (even transparent) */
+  background-color: transparent; 
+  border: 2px solid #000000;
+}
+
+.half-main-area-style {
+  min-height: 515px;
+}
+
+/* playing area below photo */
+.playing-area-small-style {
+  min-height: 230px;
+  background-color: red;
+}
