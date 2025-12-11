@@ -1,10 +1,11 @@
 package Utils;
 
-our @EXPORT = qw ( print_error print_hash_params find_element_in_array remove_trailing_squares remove_leading_article turn_display_off turn_display_on format_number );
+our @EXPORT = qw ( construct_album_uid write_data_to_file print_error print_hash_params find_element_in_array remove_trailing_squares remove_leading_article turn_display_off turn_display_on format_number );
 use base qw(Exporter);
 
 use strict;
 use Time::Local;
+use URI;
 
 use lib "/home/pi/display";
 
@@ -62,5 +63,21 @@ sub turn_display_on {
   `sudo echo 2 > /sys/class/backlight/10-0045/brightness`;
 }
 
+sub write_data_to_file {
+  my ($data, $url) = @_;
+  my $u = URI->new($url);
+  my $path = $u->rel("http://docker:8096/");
+  $path =~ tr/?&/__/;
+  open(FH, '>', "json/$path");
+  print FH $data;
+  close FH;
+}
+
+sub construct_album_uid {
+  my $album_ref = shift;
+  my $tracks_ref = $album_ref->{"tracks"};
+  my $uid = $album_ref->{"artist"}->{"name"} . "/" . $album_ref->{"title"} . "/" . $tracks_ref->{(keys %$tracks_ref)[0]}->{"id"};             # construct unique id based on artist name / album title
+  return $uid;
+}
 
 1;

@@ -3,7 +3,7 @@ package Audio;
 use strict;
 use v5.28;
 
-our @EXPORT = qw ( audio_init @audio_q audio_task );
+our @EXPORT = qw ( audio_init @audio_q audio_task audio_state);
 use base qw(Exporter);
 
 use lib "/home/pi/display";
@@ -41,6 +41,7 @@ sub audio_init {
   print_error("audio init");
   my $pulse = `pulseaudio --start`;
   new_player();
+  Glib::Source->remove($message_poll) if $message_poll;
   $message_poll = Glib::Timeout->add(1000, sub {
     return 1 unless $polling;                   # only poll if enabled
     player_poll();
@@ -100,7 +101,7 @@ sub audio_play {
 }
 
 sub audio_pause_play {
-  print_error("audio play/pause");
+  #print_error("audio play/pause");
   return unless $player;
   $player->pause();
 }
@@ -110,6 +111,7 @@ sub audio_task {
   while (1) {
     my $message = $audio_q[0]->dequeue();                 # wait for next message
     if ($message->{"command"} eq "play") {
+      audio_init();
       audio_play($message->{"path"});
     } elsif ($message->{"command"} eq "stop") {
       audio_stop();

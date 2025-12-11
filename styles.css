@@ -38,14 +38,23 @@ button:active {
 }
 
 /* used by display_string */
-.information-style {
+.display-string-style {
   font-size: 24pt;
-  min-height: 802px;
 }
 
-.radio-item-title-style {
+.information-style {
+  min-height: 904px;
+}
+
+.scroll-item-title-style {
   font-size: 16pt;
   margin-top: 10px;
+}
+
+.scroll-item-title2-style {
+  font-size: 16pt;
+  margin-top: 10px;
+  color: yellow;
 }
 
 .photo-path-style {
@@ -56,26 +65,94 @@ button:active {
 }
 
 .photo-image-style {
-  min-height: 745px;            /* also in prepare_photo */
+  min-height: 851px;            /* also in prepare_photo */
 }
 
 scrolledwindow {
-  margin-left: 30px;
-  margin-right: 30px;
+  margin-left: 20px;
+  margin-right: 20px;
 }
 
 .outlined-box {
   /* REQUIRED: Set a background color. GTK often won't draw a border unless a background is set (even transparent) */
   background-color: transparent; 
-  border: 2px solid #000000;
+  border-color: white;
+  border-width: 2px;
+  border-style: solid;
+}
+
+.transport-icons-box-style {
+  margin-top: 25px;
+  margin-bottom: 50px;
+  margin-right: 30px;
+  background-color: transparent; 
+  border: 2px solid yellow;
+}
+
+.transport-box-style {
+  padding: 7px;
 }
 
 .half-main-area-style {
   min-height: 515px;
 }
 
-/* playing area below photo */
+/* playing area below photo, was 230px */
 .playing-area-small-style {
-  min-height: 230px;
-  background-color: red;
+  min-height: 124px;
+}
+
+/*.playing-area-large-style {
+  background-color: blueviolet;
+}*/
+
+/* text style for playing info */
+.playing-text-style {
+  font-size: 23pt;
+  margin-top: 10px;
+}
+
+.playing-text-box-style {
+  margin-top: 10px;
+}
+
+.radio-playing-image-style {
+  margin-top: 20px;
+}
+
+/* text style for album title in main playing area */
+.playing-album-title-text-style {
+  font-size: 25pt;
+  font-weight: bold;
+  margin-left: 5px;
+  margin-right: 5px;
+}
+
+/* text style for artist name in main playing area */
+.playing-artist-name-text-style {
+  font-size: 25pt;
+  margin-left: 5px;
+  margin-right: 5px;
+  color: yellow;
+}
+
+.playing-album-artist-box-style {
+  min-width: 400px;
+}
+
+.playing-icon-details-style {
+  margin-top: 30px;
+  margin-bottom: 10px;
+}
+
+.letter-box-text-style {
+  background-color: #B2B200;
+  color:blue;
+  font-size: 40pt;
+  padding: 8px;
+  padding-top: 20px;
+  border-color: yellow;
+  border-width: 2px;
+  border-style: solid;
+  min-width: 65px;
 }

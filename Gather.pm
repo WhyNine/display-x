@@ -10,8 +10,6 @@ use strict;
 use lib "/home/pi/display";
 use Utils;
 
-use IPC::MPS;
-
 
 sub gather_pictures {
   my $path = shift;
@@ -34,7 +32,7 @@ sub gather_pictures {
       }
     } elsif (-f "$path/$file" && $file =~ /\.(jpg|jpeg|gif|tiff|bmp|png)$/i) {
       push(@pics, "$path/$file");
-      print_error("Found picture: $path/$file");
+      #print_error("Found picture: $path/$file");
     }
   } ## end foreach my $file (@dir)
   return (\@pics);

@@ -11,15 +11,15 @@ use base qw(Exporter);
 use lib "/home/pi/display";
 
 use Utils;
-use MQTT;
+#use MQTT;
 
 use Gtk3 -init;
 use Glib;
 use Cairo;
+use Pango;
 use List::Util qw(min);
 use File::Basename;
 use Image::ExifTool qw(:Public);
-#use Image::Resize;
 
 my $window;
 use constant WIDTH => 720;
@@ -46,6 +46,7 @@ my %orientations = (
 
 sub delete_all_children {
   my ($box) = @_;
+  return unless defined $box;
   my @children = $box->get_children;
   foreach my $child (@children) {
     $box->remove($child);
@@ -65,8 +66,9 @@ sub insert_as_first_child {
 }
 
 sub load_image {
-  my ($file_path, $size) = @_;
-  my $pixbuf = Gtk3::Gdk::Pixbuf->new_from_file_at_scale($file_path, $size, $size, 1);
+  my ($file_path, $size, $h) = @_;
+  $h = (defined $h) ? $h : $size;
+  my $pixbuf = Gtk3::Gdk::Pixbuf->new_from_file_at_scale($file_path, $size, $h, 1);
   if (!$pixbuf) {
     print_error("Failed to load pixbuf from $file_path!");
     return;
@@ -127,7 +129,8 @@ sub display_string {
   print_error("Displaying string: $str");
   delete_first_child($main_area);
   my $text_box = Gtk3::Label->new($str);
-  add_style_class($text_box, 'information-style');
+  add_style_class($text_box, 'display-string-style');
+  add_style_class($text_box, ($full_playing_area == 1) ? 'half-main-area-style' : 'information-style');
   insert_as_first_child($main_area, $text_box);
   $window->show_all;
 }
@@ -136,6 +139,52 @@ sub add_style_class {
   my ($widget, $class_name) = @_;
   my $context = $widget->get_style_context;
   $context->add_class($class_name);
+}
+
+# Create small icon with  title below
+# Args: title, url of icon, callback address, arg to pass to callback
+sub create_scroll_item_with_title {
+  my (%args) = @_;
+  my $title1 = $args{'title1'};
+  my $title2 = $args{'title2'};
+  my $fname = $args{'icon_path'};
+  my $callback = $args{'callback'};
+  my $arg = $args{'callback_arg'};
+  #print_error("display scroll item: $title, $fname");
+  my $icon = create_square_image($fname, "images/missing-image-icon.jpg", 200);
+  my $icon_vbox = Gtk3::Box->new('vertical', 0);
+  $icon_vbox->pack_start($icon, 0, 0, 0);
+  my $icon_title = Gtk3::Label->new($title1);
+  add_style_class($icon_title, 'scroll-item-title-style');
+  $icon_title->set_line_wrap(1);
+  $icon_title->set_halign('center');
+  $icon_vbox->pack_start($icon_title, 0, 0, 0);
+  if ($title2) {
+    my $icon_artist = Gtk3::Label->new($title2);
+    add_style_class($icon_artist, 'scroll-item-title2-style');
+    $icon_artist->set_line_wrap(1);
+    $icon_artist->set_halign('center');
+    $icon_vbox->pack_start($icon_artist, 0, 0, 0);
+  }
+  my $icon_button = Gtk3::Button->new;
+  $icon_button->add($icon_vbox);
+  $icon_button->signal_connect('clicked' => sub {
+    &$callback($arg);
+  });
+  return $icon_button;
+}
+
+sub construct_scrolled_grid_box {
+  my $spacing = shift;
+  my $scrolled_window = Gtk3::ScrolledWindow->new(undef, undef);    # Main container for the scrolling area
+  add_style_class($scrolled_window, 'half-main-area-style');
+  my $icon_grid = Gtk3::Grid->new;                # The grid that will hold all the icons
+  $icon_grid->set_row_spacing($spacing);                # Set spacing between rows and columns
+  $icon_grid->set_column_spacing($spacing);
+  $icon_grid->set_halign('center');
+  $scrolled_window->add($icon_grid);              # Add the grid to the scrolled window (This makes the grid scrollable)
+  insert_as_first_child($main_area, $scrolled_window);
+  return $icon_grid;
 }
 
 #----------------------------------------------------------------------------------------------------------------------
@@ -167,6 +216,7 @@ sub init_fb {
   $main_area = Gtk3::Box->new('vertical', 0);
   $main_area->signal_connect('size-allocate' => sub {
     my ($widget, $allocation) = @_;
+    return if ($widget->get_allocated_width == 722) && ($widget->get_allocated_height == 1032);
     print_error("Main area resized to " . $widget->get_allocated_width . "x" . $widget->get_allocated_height);
   });
   $vbox->pack_start($main_area, 1, 0, 0);                   # Place at the top of the window taking rest of space
@@ -213,8 +263,7 @@ sub print_footer {
     #print_error("Loading footer icon $icon");
     my $path = "images/" . $icon . "-icon.png";
     if (-e $path) {
-      my $image = Gtk3::Image->new_from_file($path);
-      $image->set_pixel_size(116);                                  # Scales the image to 120 pixels, preserving aspect ratio.
+      my $image = load_image($path, 117);
       my $button = Gtk3::Button->new;
       $button->add($image);
       $button->signal_connect('clicked' => sub {&{$footer_callbacks{$icon}};});           # &{$footer_callbacks{$icon}}
@@ -252,7 +301,7 @@ sub setup_main_area_for_photos {
   delete_all_children($main_area);
   my $vbox1 = Gtk3::Box->new('vertical', 0);
   $main_area->pack_start($vbox1, 0, 0, 0);
-  my $vbox2 = Gtk3::Box->new('vertical', 0);
+  my $vbox2 = Gtk3::Box->new('horizontal', 0);
   add_style_class($vbox2, 'playing-area-small-style');
   $main_area->pack_end($vbox2, 0, 0, 0);
   $window->show_all;
@@ -268,8 +317,96 @@ sub setup_main_area_for_others {
   add_style_class($vbox2, 'half-main-area-style');
   $main_area->pack_start($vbox1, 0, 0, 0);
   $main_area->pack_start($sep, 0, 0, 0);
-  $main_area->pack_start($vbox2, 0, 0, 0);
+  $main_area->pack_end($vbox2, 0, 0, 0);
   $full_playing_area = 1;
+}
+
+sub clear_play_area {
+  my @children = $main_area->get_children;
+  my $playing_box = $children[-1];                      # last child is playing area
+  delete_all_children($playing_box);
+  $window->show_all;
+  return $playing_box;
+}
+
+#----------------------------------------------------------------------------------------------------------------------
+sub find_font_size_to_fit {
+    my ($label, $max_width) = @_;
+    my $text = $label->get_text;
+    
+    # 1. Create a Pango Layout to measure the text
+    my $layout = $label->create_pango_layout($text);
+    my $best_size = 8;                # Start with a minimum size (e.g., 8 points)
+    
+    # 2. Iterate from a large size down to the minimum
+    # (e.g., 38pt down to 8pt) to find the largest fitting size.
+    for my $size (reverse(8..38)) { 
+        # Set the font description for measurement (e.g., "Sans 48pt")
+        my $font_desc = Pango::FontDescription->from_string("Nimbus Sans ${size}pt");
+        $layout->set_font_description($font_desc);
+        my ($width_pango, $height_pango) = $layout->get_size();           # Get the measured size in Pango units
+        my $width_pixels = $width_pango / Pango::SCALE;                   # Convert Pango units (1024 units per pixel) to actual pixels
+        # Check if the measured width fits within the container's max width
+        if ($width_pixels <= $max_width) {
+            $best_size = $size;
+            last; # Found the largest size that fits
+        }
+    }
+    
+    # 3. Apply the final size using Pango Markup
+    # We use 'font_desc' in markup to apply the specific point size
+    my $final_markup = "<span font_desc=\"Nimbus Sans ${best_size}pt\">" . $text . "</span>";
+    $label->set_markup($final_markup);
+}
+
+# args: 2 lines of text of what is playing, width of gap to print into
+sub display_playing_text {
+  my ($box, $line1, $line2, $width) = @_;
+  print_error("Displaying playing text: $line1 / $line2");
+  my $vbox = Gtk3::Box->new('vertical', 0);
+  my $tbox1 = Gtk3::Label->new($line1);
+  add_style_class($tbox1, 'playing-text-style');
+  $tbox1->set_halign('center');
+  $vbox->pack_start($tbox1, 0, 0, 0);
+  my $tbox2 = Gtk3::Label->new($line2);
+  add_style_class($tbox2, 'playing-text-style');
+  $tbox2->set_halign('center');
+  $vbox->pack_start($tbox2, 0, 0, 0);
+  add_style_class($vbox, 'playing-text-box-style');
+  $box->pack_start($vbox, 1, 1, 0);
+  #need to find best font size to fit in width
+}
+
+sub display_playing_nothing {
+  my @children = $main_area->get_children;
+  my $playing_box = $children[-1];                      # last child is playing area
+  delete_all_children($playing_box);
+  $window->show_all;
+}
+
+# Args: playing area box, ref to array of refs to hash with icon file names and callbacks
+sub print_transport_icons {
+  my ($playing_box, $buttons_ref) = @_;
+  my @buttons = @$buttons_ref;
+  my $hbox = Gtk3::Box->new('horizontal', 0);
+  add_style_class($hbox, 'transport-icons-box-style');
+  foreach my $button_ref (@buttons) {
+    my $fname = $button_ref->{"icon-filename"};
+    my $callback = $button_ref->{"callback"};
+    if (-e "images/$fname.png") {
+      my $image = load_image("images/$fname.png", 60);
+      my $button = Gtk3::Button->new;
+      $button->add($image);
+      $button->signal_connect('clicked' => sub {&{$callback}();});
+      $button->set_halign('end');
+      add_style_class($button, 'transport-box-style');
+      $hbox->pack_start($button, 0, 0, 0);
+    } else {
+      print_error("Unable to load transport icon images/$fname.png");
+    }
+  }
+  $hbox->set_halign('end');
+  $playing_box->pack_end($hbox, 0, 0, 0);
 }
 
 #----------------------------------------------------------------------------------------------------------------------
@@ -322,7 +459,7 @@ sub prepare_photo {
     }
     my $width = $new_pixbuf->get_width;
     my $height = $new_pixbuf->get_height;
-    my $scale_factor = min(WIDTH / $width, 745 / $height);              # also in photo-image-style
+    my $scale_factor = min(WIDTH / $width, 851 / $height);              # also in photo-image-style
     my $final_pixbuf = $new_pixbuf->scale_simple(
       $width * $scale_factor, 
       $height * $scale_factor, 
@@ -357,7 +494,7 @@ sub display_photo {
   if (-e $fname) {
     my $pixbuf = prepare_photo($fname);
     if (defined $pixbuf) {
-      print_error("Displaying photo: $fname");
+      #print_error("Displaying photo: $fname");
       my $vbox = Gtk3::Box->new('vertical', 0);
       insert_as_first_child($main_area, $vbox);
       my ($file, $folder) = extract_file_details($fname);
@@ -377,40 +514,16 @@ sub display_photo {
 }
 
 #----------------------------------------------------------------------------------------------------------------------
-# Create small icon with title below
-# Args: title, url of icon, callback address, arg to pass to callback
-sub create_radio_item {
-  my ($title, $fname, $callback, $arg) = @_;
-  print_error("display radio item: $title, $fname");
-  my $icon = create_square_image("images/radio-icons/$fname", "images/missing-image-icon.jpg", 200);
-  my $icon_title = Gtk3::Label->new($title);
-  my $icon_vbox = Gtk3::Box->new('vertical', 0);
-  add_style_class($icon_title, 'radio-item-title-style');
-  $icon_vbox->pack_start($icon, 0, 0, 0);
-  $icon_vbox->pack_start($icon_title, 0, 0, 0);
-  my $icon_button = Gtk3::Button->new;
-  $icon_button->add($icon_vbox);
-  $icon_button->signal_connect('clicked' => sub {
-    &$callback($arg);
-  });
-  return $icon_button;
-}
-
 # Args: ref to radio stations, callback
 sub display_radio_top {
   my ($ref_lists, $callback) = @_;
   my %radio_list = %$ref_lists;
   delete_first_child($main_area);
-  my $scrolled_window = Gtk3::ScrolledWindow->new(undef, undef);    # Main container for the scrolling area
-  add_style_class($scrolled_window, 'half-main-area-style');
-  my $icon_grid = Gtk3::Grid->new;                # The grid that will hold all the icons
-  $icon_grid->set_row_spacing(30);                # Set spacing between rows and columns
-  $icon_grid->set_column_spacing(30);
-  $scrolled_window->add($icon_grid);              # Add the grid to the scrolled window (This makes the grid scrollable)
+  my $icon_grid = construct_scrolled_grid_box(30);
   my $i = 0;
   my $j = 0;
   foreach my $label (sort keys %radio_list) {
-    my $icon_button = create_radio_item($ref_lists->{$label}->{"name"}, $ref_lists->{$label}->{"thumbnail"}, $callback, $label);
+    my $icon_button = create_scroll_item_with_title('title1' => $ref_lists->{$label}->{"name"}, 'icon_path' => "images/radio-icons/" . $ref_lists->{$label}->{"thumbnail"}, 'callback' => $callback, 'callback_arg' => $label);
     $icon_grid->attach($icon_button, $i, $j, 1, 1);
     $i++;
     if ($i == 3) {
@@ -418,39 +531,278 @@ sub display_radio_top {
       $j++;
     }
   }
-  insert_as_first_child($main_area, $scrolled_window);
   $window->show_all;
 }
 
-# Args: radio label, ref to stations, full(1)/minimal
+# Args: radio label, ref to stations, ref to transport buttons
 sub display_playing_radio {
-  my ($label, $radio_stations_ref, $transport_areas_ref) = @_;
+  my ($label, $radio_stations_ref, $transport_buttons_ref) = @_;
   print_error("Playing radio $label");
-  #clear_play_area($full);
-  #print_transport_icons({"stop" => 1}, $transport_areas_ref);
-  #$fb->clip_reset();
-  my $full = 0; #TEMP
-  if ($full) {
+  my $playing_box = clear_play_area();
+  if ($full_playing_area) {
     my $fname = $radio_stations_ref->{$label}->{"icon"};
     $fname = "images/radio-icons/$fname";
+    $fname = "images/missing-image-icon.jpg" unless -e $fname;
     if (-e $fname) {
-  #    my $image = $fb->load_image({
-  #      'y'          => 680,
-  #      'x'          => 0,
-  #      'width'      => WIDTH,
-  #      'height'     => 348,
-  #      'file'       => $fname,
-  #      'convertalpha' => FALSE, 
-  #      'preserve_transparency' => TRUE
-  #    });
-  #    $image->{'x'} = (WIDTH - $image->{'width'}) / 2;
-  #    $image->{'y'} = 680 + (348 - $image->{'height'}) / 2;
-  #    $fb->blit_write($image);
+      my $image = load_image($fname, WIDTH, 370);
+      $image->set_halign('center');
+      add_style_class($image, 'radio-playing-image-style');
+      $playing_box->pack_start($image, 0, 0, 0);
+      my $hbox = Gtk3::Box->new('horizontal', 0);
+      print_transport_icons($hbox, $transport_buttons_ref);
+      $playing_box->pack_end($hbox, 0, 0, 0);
     }
   } else {
-  #  display_playing_text("Playing: ", $radio_stations_ref->{$label}->{"name"}, 610);
+    display_playing_text($playing_box, "Playing: ", $radio_stations_ref->{$label}->{"name"}, 610);
+    print_transport_icons($playing_box, $transport_buttons_ref);
+  }
+  $window->show_all;
+}
+
+#----------------------------------------------------------------------------------------------------------------------
+# $title is either album title or playlist title or radio name
+# $playlist_flag is 1 for playlist/radio, 0 for album
+sub display_play_screen_core {
+  my ($title, $thumb_path, $artist_name, $track_title, $track_number, $tracks_total, $playlist_flag) = @_;
+  #print_error("title: $title, track title: $track_title, artist name: $artist_name");
+  if ($full_playing_area) {
+    my $hbox1 = Gtk3::Box->new('horizontal', 0);
+    my $icon = create_square_image($thumb_path, "images/missing-music-group-icon.png",300);
+    add_style_class($icon, 'outlined-box');
+    $hbox1->pack_start($icon, 0, 0, 0);
+    my $str = remove_trailing_squares(($playlist_flag) ? $track_title : $title);
+    my $title_label = Gtk3::Label->new($str);
+    $title_label->set_line_wrap(1);
+    $title_label->set_valign('end');
+    $title_label->set_halign('center');
+    $title_label->set_justify('center');
+    add_style_class($title_label, 'playing-album-title-text-style');
+    my $artist_label = Gtk3::Label->new($artist_name);
+    $artist_label->set_line_wrap(1);
+    $artist_label->set_halign('center');
+    $artist_label->set_valign('start');
+    $artist_label->set_justify('center');
+    add_style_class($artist_label, 'playing-artist-name-text-style')  ;
+    my $vbox = Gtk3::Box->new('vertical', 0);
+    add_style_class($vbox, 'playing-album-artist-box-style');
+    $vbox->pack_start($title_label, 1, 1, 0);
+    $vbox->pack_start($artist_label, 1, 1, 0);
+    $hbox1->pack_end($vbox, 0, 0, 0);
+    add_style_class($hbox1, 'playing-icon-details-style');
+    return $hbox1;
+  } else {
+    return;
   }
 }
+
+#----------------------------------------------------------------------------------------------------------------------
+# Args: playlist id, ref to playlists, index to track being played
+sub display_playing_playlist {
+  my ($id, $playlists_ref, $track_no, $transport_ref) = @_;
+  my %playlists = %$playlists_ref;
+  my $tracks_ref = $playlists{$id}->{"tracks"};
+  my $title = $playlists{$id}->{"name"};
+  my $track_id = $tracks_ref->[$track_no]->{"id"};
+  my $album_id = $tracks_ref->[$track_no]->{"album_id"};
+  print_error("Playing from playlist $title, track number $track_no");
+  my $tracks_thumb_path = "thumbnail_cache/Items/$track_id/Images/Primary.jpg";
+  $tracks_thumb_path = "thumbnail_cache/Items/$album_id/Images/Primary.jpg" if (! -e $tracks_thumb_path);      # use album art if no track art
+  #print_error("Track thumb path $tracks_thumb_path");
+  my $artist_name = $tracks_ref->[$track_no]->{"artist_name"};
+  my $track_title = $tracks_ref->[$track_no]->{"track_title"};
+  my $playing_box = clear_play_area();
+  my $info_box = display_play_screen_core($title, $tracks_thumb_path, $artist_name, $track_title, 0, 0, 1);
+  $playing_box->pack_start($info_box, 0, 0, 0) if $info_box;
+  my $hbox = Gtk3::Box->new('horizontal', 0);
+  display_playing_text($hbox, "Playing:", "$title playlist", 400);
+  print_transport_icons($hbox, $transport_ref);
+  $playing_box->pack_end($hbox, 0, 0, 0);
+  $window->show_all();
+}
+
+# Args: ref to playlists hash, callback
+sub display_playlists_top {
+  my ($ref_playlists, $callback) = @_;
+  print_error("Displaying playlists top");
+  sub sort_playlists_by_name { return $$ref_playlists{$a}->{"name"} cmp $$ref_playlists{$b}->{"name"}; }
+  if (defined $ref_playlists) {
+    delete_first_child($main_area);
+    my $icon_grid = construct_scrolled_grid_box(30);
+    my $i = 0;
+    my $j = 0;
+    #print_error("Number of playlists: " . scalar(keys %$ref_playlists));
+    foreach my $id (sort sort_playlists_by_name keys %$ref_playlists) {             # display playlists alphabetically
+      #print_error("Playlist id: $id, name: " . $$ref_playlists{$id}->{"name"});
+      my $icon_button = create_scroll_item_with_title('title1' => $$ref_playlists{$id}->{"name"}, 'icon_path' => "thumbnail_cache/Items/" . $id . "/Images/Primary.jpg", 'callback' => $callback, 'callback_arg' => $id);
+      $icon_grid->attach($icon_button, $i, $j, 1, 1);
+      $i++;
+      if ($i == 3) {
+        $i = 0;
+        $j++;
+      }
+    }
+  } else {
+    display_string("Please wait ...");
+  }
+  $window->show_all;
+}
+
+#----------------------------------------------------------------------------------------------------------------------
+# Args: ref to hash of letters, callback function
+sub display_letter_grid {
+  my ($ref, $callback) = @_;
+  delete_first_child($main_area);
+  my $icon_grid = construct_scrolled_grid_box(30);
+  my $i = 0;
+  my $j = 0;
+  foreach my $label (sort keys %$ref) {
+    my $letter_box = Gtk3::Label->new($label);
+    add_style_class($letter_box, 'letter-box-text-style');
+    $letter_box->set_halign('center');
+    $letter_box->set_valign('center');
+    my $letter_button = Gtk3::Button->new;
+    $letter_button->add($letter_box);
+    $letter_button->signal_connect('clicked' => sub {
+      &$callback($label);
+    });
+    $icon_grid->attach($letter_button, $i, $j, 1, 1);
+    $i++;
+    if ($i == 6) {
+      $i = 0;
+      $j++;
+    }
+  }
+  $window->show_all;
+}
+
+# display grid of first letters of albums
+# Args: ref to albums by letter hash, callback
+sub display_albums_top {
+  display_letter_grid($_[0], $_[1]);
+}
+
+# display grid of album icons with title/artist below
+# Args: ref to array of ref to hash 4 (sorted by album name), callback
+sub display_albums_with_letter {
+  my ($ref, $callback) = @_;
+  my @albums = @$ref;
+  #print_error("Displaying " . scalar @albums . " albums for selected letter");
+  delete_first_child($main_area);
+  my $icon_grid = construct_scrolled_grid_box(30);
+  my $y = 0;
+  my $x = 0;
+  for my $i (0 .. $#albums) {
+    my $uid = construct_album_uid($albums[$i]);
+    my $icon_button = create_scroll_item_with_title(title1 => $albums[$i]->{"title"}, 
+                                                    title2 => $albums[$i]->{"artist"}->{"name"},
+                                                    icon_path => "thumbnail_cache/Items/" . $albums[$i]->{"id"} . "/Images/Primary.jpg", 
+                                                    callback => $callback, 
+                                                    callback_arg => $uid);
+    $icon_grid->attach($icon_button, $x, $y, 1, 1);
+    $x++;
+    if ($x == 3) {
+      $x = 0;
+      $y++;
+    }
+  }
+  $window->show_all();
+}
+
+sub numeric_sort {
+  return $a <=> $b;
+}
+
+# Args: ref to album, index to track being played
+sub display_playing_album {
+  my ($album_ref, $track, $transport_ref, $paused) = @_;
+  my $playing_box = clear_play_area();
+  my $album_title = $$album_ref{"title"};
+  my $album_thumb_url = $$album_ref{"id"};
+  my $artist_ref = $$album_ref{"artist"};
+  my $artist_name = $$artist_ref{"name"};
+  my $tracks_ref = $$album_ref{"tracks"};
+  my $track_title = $$tracks_ref{$track}->{"title"};
+  my $album_thumb_path = "thumbnail_cache/Items/$album_thumb_url/Images/Primary.jpg";
+  my @track_keys = sort numeric_sort keys %$tracks_ref;
+  my $track_no = find_element_in_array($track, \@track_keys) + 1;
+  my $info_box = display_play_screen_core($album_title, $album_thumb_path, $artist_name, $track_title, 0, 0, 1);
+  $playing_box->pack_start($info_box, 0, 0, 0) if $info_box;
+  my $hbox = Gtk3::Box->new('horizontal', 0);
+  display_playing_text($hbox, "Track $track_no of " . scalar @track_keys, $track_title, 400);
+  print_transport_icons($hbox, $transport_ref);
+  $playing_box->pack_end($hbox, 0, 0, 0);
+  $window->show_all();
+}
+
+#----------------------------------------------------------------------------------------------------------------------
+# Display a grid of letters for the artists
+# Args: ref to artists by letter hash, callback
+sub display_artists_top {
+  display_letter_grid($_[0], $_[1]);
+}
+
+# Args: ref to hash 1 (artists name), callback
+# Grid of album thumbnails with artist below
+sub display_artists_with_letter {
+  my ($aref, $callback) = @_;
+  my @artists = sort keys %$aref;
+  delete_first_child($main_area);
+  my $icon_grid = construct_scrolled_grid_box(30);
+  my $y = 0;
+  my $x = 0;
+  foreach my $i (@artists) {
+    my $icon_button = create_scroll_item_with_title(title1 => $aref->{$i}->{"name"}, 
+                                                    icon_path => "thumbnail_cache/Items/" . $aref->{$i}->{"id"} . "/Images/Primary.jpg", 
+                                                    callback => $callback, 
+                                                    callback_arg =>$aref->{$i}->{"name"});
+    $icon_grid->attach($icon_button, $x, $y, 1, 1);
+    $x++;
+    if ($x == 3) {
+      $x = 0;
+      $y++;
+    }
+  }
+  $window->show_all();
+}
+
+# display grid of album icons
+# Args: ref to hash 2, callback
+# Grid of album thumbnails with title/artist below
+sub display_artist_albums_with_letter {
+  my ($aref, $callback) = @_;
+  my @albums;
+  foreach my $key (keys %{$aref->{"albums"}}) {
+    push(@albums, {"key" => $key, "ref" => $aref->{"albums"}->{$key}})
+  }
+  @albums = sort album_key_sort @albums;
+  #print_error("number of albums found: " . scalar @albums);
+  delete_first_child($main_area);
+  my $icon_grid = construct_scrolled_grid_box(30);
+  my $y = 0;
+  my $x = 0;
+  for my $i (0 .. $#albums) {
+    my $ref = $albums[$i]->{'ref'};
+    my $uid = construct_album_uid($ref);
+    #print_error("Displaying album: " . $ref->{"title"} . " by " . $ref->{"artist"}->{"name"});
+    my $icon_button = create_scroll_item_with_title(title1 => $ref->{"title"}, 
+                                                    title2 => $ref->{"artist"}->{"name"},
+                                                    icon_path => "thumbnail_cache/Items/" . $ref->{"id"} . "/Images/Primary.jpg", 
+                                                    callback => $callback, 
+                                                    callback_arg => $uid);
+    $icon_grid->attach($icon_button, $x, $y, 1, 1);
+    $x++;
+    if ($x == 3) {
+      $x = 0;
+      $y++;
+    }
+  }
+  $window->show_all();
+}
+
+sub album_key_sort {
+  return remove_leading_article($a->{"ref"}->{"title"}) cmp remove_leading_article($b->{"ref"}->{"title"});
+}
+
 
 #----------------------------------------------------------------------------------------------------------------------
 
