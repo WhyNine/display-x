@@ -849,6 +849,7 @@ sub display_artists_by_letter {
   if (scalar keys %artists_by_letter) {                # artist list is available?
     display_artists_top(\%artists_by_letter, \&display_artists_by_icon);
   } else {                                            # still waiting for artist list to be compiled
+    #display_artists_top({"A" => 1, "b" => 1, "c" => 1, "d" => 1, "e" => 1, "f" => 1, "g" => 1, "h" => 1, "i" => 1, "j" => 1, "k" => 1, "l" => 1, "m" => 1, "n" => 1, "b" => 1, "p" => 1, "q" => 1, "r" => 1, "s" => 1, "t" => 1, "u" => 1, "v" => 1, "w" => 1, "x" => 1, "y" => 1, "z" => 1, }, \&display_artists_by_icon);
     display_string("Please wait ...");
   }
 }
@@ -941,8 +942,8 @@ Glib::Timeout->add(200, sub {                         # check every 200ms for au
   if (my $message = $audio_q[1]->dequeue_nb()) {
     if ($message eq "play_stopped") {
       print_error("play stopped, mode = $mode_playing_area");
-      #album_next_track() if $mode_playing_area == PLAYING_ALBUM;
-      #playlist_next_track() if $mode_playing_area == PLAYING_PLAYLIST;
+      album_next_track() if $mode_playing_area == PLAYING_ALBUM;
+      playlist_next_track() if $mode_playing_area == PLAYING_PLAYLIST;
     }
   }
   return 1;                 # Continue the timeout

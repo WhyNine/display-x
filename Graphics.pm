@@ -301,7 +301,7 @@ sub setup_main_area_for_photos {
   delete_all_children($main_area);
   my $vbox1 = Gtk3::Box->new('vertical', 0);
   $main_area->pack_start($vbox1, 0, 0, 0);
-  my $vbox2 = Gtk3::Box->new('horizontal', 0);
+  my $vbox2 = Gtk3::Box->new('vertical', 0);
   add_style_class($vbox2, 'playing-area-small-style');
   $main_area->pack_end($vbox2, 0, 0, 0);
   $window->show_all;
@@ -553,8 +553,10 @@ sub display_playing_radio {
       $playing_box->pack_end($hbox, 0, 0, 0);
     }
   } else {
-    display_playing_text($playing_box, "Playing: ", $radio_stations_ref->{$label}->{"name"}, 610);
-    print_transport_icons($playing_box, $transport_buttons_ref);
+    my $hbox = Gtk3::Box->new('horizontal', 0);
+    $playing_box->pack_start($hbox, 0, 0, 0);
+    display_playing_text($hbox, "Playing: ", $radio_stations_ref->{$label}->{"name"}, 610);
+    print_transport_icons($hbox, $transport_buttons_ref);
   }
   $window->show_all;
 }

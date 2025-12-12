@@ -66,7 +66,7 @@ sub turn_display_on {
 sub write_data_to_file {
   my ($data, $url) = @_;
   my $u = URI->new($url);
-  my $path = $u->rel("http://docker:8096/");
+  my $path = $u->rel("http://docker.local:8096/");
   $path =~ tr/?&/__/;
   open(FH, '>', "json/$path");
   print FH $data;
