@@ -930,6 +930,13 @@ $pids{"http"} = threads->create(sub{
   }
 })->detach();
 
+$pids{"HealthCheck"} = threads->create(sub{                    # ping to healthcheck.io to say we're still running
+  while (1) {  
+    sleep(60);
+    my @res = system("/bin/bash -c 'curl $health_check_url' > /dev/null 2>&1");
+  }
+})->detach();
+
 Glib::Timeout->add(500, sub {                         # check every 500ms for new pictures list
   if (my $pics_ref = $pictures_q->dequeue_nb()) {
     $pictures = $pics_ref;
@@ -1005,3 +1012,4 @@ receive {
 
 print_error("Starting graphics");
 start_graphics();
+`pkill vlc`;
