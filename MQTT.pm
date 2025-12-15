@@ -1,7 +1,7 @@
 package MQTT;
 
-our @EXPORT = qw ( check_mqtt_subscribed get_mqtt_values return_car_battery return_car_connected return_car_time return_solar_battery return_solar_power 
-  return_solar_exported return_solar_bat_power return_car_range return_ink_black return_ink_cyan return_ink_magenta return_ink_yellow);
+our @EXPORT = qw ( get_mqtt_values return_car_battery return_car_connected return_car_time return_solar_battery return_solar_power 
+  return_solar_exported return_solar_bat_power return_car_range return_ink_black return_ink_cyan return_ink_magenta return_ink_yellow @mqtt_q);
 use base qw(Exporter);
 
 use strict;
@@ -11,13 +11,20 @@ use lib "/home/pi/display";
 use Utils;
 use UserDetails qw ( $mqtt_ref );
 
-use AnyEvent::MQTT;
+use threads;
+use threads::shared;
+use Thread::Queue;
+use Net::MQTT::Simple;
+use Net::MQTT::Simple::Auth;
 
 my @topics_subs = (\&return_car_battery, \&return_car_connected, \&return_car_range, \&return_car_time, \&return_solar_bat_power, \&return_solar_battery, \&return_solar_exported, 
   \&return_solar_power, \&return_ink_black, \&return_ink_cyan, \&return_ink_magenta, \&return_ink_yellow);
 my %data;
+my @topics;
 my $mqtt_instance;
 my $subscribed;
+our @mqtt_q : shared;
+@mqtt_q = (Thread::Queue->new, Thread::Queue->new);  # to/from queues for mqtt messages (to = to audio thread, from = from audio thread)
 
 sub return_car_battery {
   return "car/battery";
@@ -100,13 +107,15 @@ sub check_mqtt_subscribed {
   my $online = (my $server = mqtt_server_address());
   while (!$online) {
     print_error("Unable to ping MQTT server " . $mqtt_ref->{'server'});
-    $mqtt_instance->cleanup() if $mqtt_instance;
+    $mqtt_instance->disconnect() if $mqtt_instance;
     $mqtt_instance = undef;
     sleep 1;
     $online = ($server = mqtt_server_address());
   }
   if (!$mqtt_instance && $online) {
-    $mqtt_instance = AnyEvent::MQTT->new(host => $server, user_name => $mqtt_ref->{'username'}, password => $mqtt_ref->{'password'});
+    $ENV{MQTT_SIMPLE_ALLOW_INSECURE_LOGIN} = 1;
+    $mqtt_instance = Net::MQTT::Simple->new($server);
+    $mqtt_instance->login($mqtt_ref->{'username'}, $mqtt_ref->{'password'});
     print_error("Unable to receive messages from MQTT server " . $server) unless ($mqtt_instance);
     print_error("Connected to MQTT server $server for subscriptions") if $mqtt_instance;
     $subscribed = 0;
@@ -114,21 +123,24 @@ sub check_mqtt_subscribed {
   if ($mqtt_instance && ($subscribed == 0)) {
     foreach my $topic_sub (@topics_subs) {
       my $topic = $topic_sub->();
+      push @topics, $topic;
       print_error("Registering subscription for $topic");
-      my $cv = $mqtt_instance->subscribe(topic => $topic, callback => sub { rcv_msg(@_); });
+      #my $cv = $mqtt_instance->subscribe($topic, \&rcv_msg);
     }
     $subscribed = 1;
   }
 }
 
 sub get_mqtt_values {
-  my $data_ref = {};
+  my %data_ref : shared;
+  %data_ref = ();
   check_mqtt_subscribed();
+  $mqtt_instance->tick(30);                     # wait up to 30s for messages
   foreach my $topic (keys %data) {
-    $data_ref->{$topic} = $data{$topic};
+    $data_ref{$topic} = $data{$topic};
   }
   #print_hash_params($data_ref);
-  return $data_ref;
+  return \%data_ref;
 }
 
 

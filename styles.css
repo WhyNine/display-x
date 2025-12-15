@@ -156,3 +156,30 @@ scrolledwindow {
   border-style: solid;
   min-width: 65px;
 }
+
+.solar-top-box-style {
+  min-height: 239px;
+}
+
+.ha-title-text-style {
+  font-size: 28pt;
+  font-weight: bold;
+  margin-top: 10px;
+  margin-bottom: 10px;
+}
+
+.solar-slice-box-style {
+  margin-left: 10px;
+}
+
+.solar-slice-widget-style {
+  margin-left: 10px;
+}
+
+.solar-params-box-style {
+  margin-right: 10px;
+}
+
+.ha-param-text-style {
+  font-size: 20pt;
+}

@@ -11,13 +11,11 @@ use Utils;
 use Http;
 use Audio;
 use Photos;
-#use MQTT;
+use MQTT;
 
 use Gtk3 -init;
 use Glib;
 use Cairo;
-#use Event;
-#use AnyEvent::HTTP;
 use JSON::Parse;
 use threads;
 use threads::shared;
@@ -26,7 +24,7 @@ use Furl;
 
 my $jellyfin_user_id;
 my $pictures;           # ref to array of paths
-my $mqtt_data_ref;      # ref to hash of MQTT data
+my $mqtt_data_ref : shared;      # ref to hash of MQTT data
 
 use constant PLAYING_NOTHING => 0;
 use constant PLAYING_RADIO => 1;
@@ -74,7 +72,8 @@ my @transport_buttons_album_pause = ({"icon-filename" => "back", "callback" => \
                                      {"icon-filename" => "next", "callback" => \&album_next_track});
 
 my %pids;
-my $pictures_q = Thread::Queue->new;
+my $pictures_q : shared;
+$pictures_q = Thread::Queue->new;
 my $pictures_event;
 my $music_event;
 my $backlight_event;
@@ -82,7 +81,8 @@ my $backlight_event;
 use constant TO_THREAD => 0;
 use constant FROM_THREAD => 1;
 # Note audio_q is defined in Audio.pm
-my @http_q = (Thread::Queue->new, Thread::Queue->new);   # [0] is to send messages to http thread, [1] is to receive messages from http thread
+my @http_q : shared;
+@http_q = (Thread::Queue->new, Thread::Queue->new);   # [0] is to send messages to http thread, [1] is to receive messages from http thread
 my %callbacks;
 my $num_callbacks;
 my $music_library_key;
@@ -147,7 +147,7 @@ sub set_play_mode {
 }
 
 sub stop_all_audio {
-  $audio_q[0]->enqueue({"command" => "stop"});
+  $audio_q[TO_THREAD]->enqueue(shared_clone({"command" => "stop"}));
   `pkill vlc`;
   set_play_mode(PLAYING_NOTHING);
 }
@@ -163,14 +163,14 @@ sub transport_stop {
 }
 
 sub transport_pause {
-  $audio_q[TO_THREAD]->enqueue({"command" => "pause_play"});
+  $audio_q[TO_THREAD]->enqueue(shared_clone({"command" => "pause_play"}));
   print_error("transport pause");
   $playing_params[$mode_playing_area]->{"paused"} = 1;
   $playing_params[$mode_playing_area]->{"update_fn"}->();
 }
 
 sub transport_play {
-  $audio_q[TO_THREAD]->enqueue({"command" => "pause_play"});
+  $audio_q[TO_THREAD]->enqueue(shared_clone({"command" => "pause_play"}));
   print_error("transport play");
   $playing_params[$mode_playing_area]->{"paused"} = 0;
   $playing_params[$mode_playing_area]->{"update_fn"}->();
@@ -205,7 +205,7 @@ sub get_json {
   my ($url, $cb) = @_;
   my $id = gen_id();
   $callbacks{$id} = $cb;
-  $http_q[TO_THREAD]->enqueue({"command" => "get_json", "url" => add_apikey($jellyfin_url . $url, $jellyfin_apikey), "id" => $id});
+  $http_q[TO_THREAD]->enqueue(shared_clone({"command" => "get_json", "url" => add_apikey($jellyfin_url . $url, $jellyfin_apikey), "id" => $id}));
 };
 
 sub get_thumb {
@@ -215,7 +215,7 @@ sub get_thumb {
   $thumbnails{$image} = 1;
   my $id = gen_id();
   $callbacks{$id} = $cb;
-  $http_q[TO_THREAD]->enqueue({"command" => "get_thumb", "id" => $id, "image" => $image});
+  $http_q[TO_THREAD]->enqueue(shared_clone({"command" => "get_thumb", "id" => $id, "image" => $image}));
 };
 
 sub call_callback {
@@ -643,7 +643,7 @@ sub play_radio {
   my ($input) = @_;
   stop_all_audio();
   print_error("play radio $input");
-  $audio_q[0]->enqueue({"command" => "play", "path" => $radio_stations_ref->{$input}->{"url"}});
+  $audio_q[TO_THREAD]->enqueue(shared_clone({"command" => "play", "path" => $radio_stations_ref->{$input}->{"url"}}));
   set_play_mode(PLAYING_RADIO);
   $playing_params[PLAYING_RADIO]->{"station"} = $input;
   update_radio_playing();
@@ -675,7 +675,7 @@ sub play_playlist {
   my $tracks_ref = $playlists{$input}->{"tracks"};
   if (defined $tracks_ref) {
     $playing_params[PLAYING_PLAYLIST]->{"track"} = int rand(scalar @$tracks_ref);
-    $audio_q[TO_THREAD]->enqueue({"command" => "play", "path" => "$jellyfin_url/Items/" . $playlists{$input}->{'tracks'}->[$playing_params[PLAYING_PLAYLIST]->{'track'}]->{'id'} . "/Download?ApiKey=$jellyfin_apikey"});
+    $audio_q[TO_THREAD]->enqueue(shared_clone({"command" => "play", "path" => "$jellyfin_url/Items/" . $playlists{$input}->{'tracks'}->[$playing_params[PLAYING_PLAYLIST]->{'track'}]->{'id'} . "/Download?ApiKey=$jellyfin_apikey"}));
     $playing_params[PLAYING_PLAYLIST]->{"paused"} = 0;
     update_playlist_playing();
   } else {
@@ -696,7 +696,7 @@ sub playlist_next_track {
       last if $playing_params[PLAYING_PLAYLIST]->{"track"} != $track_no;    # only break out of loop once we have a different track number
     }
   }
-  $audio_q[TO_THREAD]->enqueue({"command" => "play", "path" => "$jellyfin_url/Items/" . $playlists{$title}->{'tracks'}->[$playing_params[PLAYING_PLAYLIST]->{'track'}]->{'id'} . "/Download?ApiKey=$jellyfin_apikey"});
+  $audio_q[TO_THREAD]->enqueue(shared_clone({"command" => "play", "path" => "$jellyfin_url/Items/" . $playlists{$title}->{'tracks'}->[$playing_params[PLAYING_PLAYLIST]->{'track'}]->{'id'} . "/Download?ApiKey=$jellyfin_apikey"}));
   update_playlist_playing();
 }
 
@@ -777,7 +777,7 @@ sub play_album {
       last;
     }
   }
-  $audio_q[TO_THREAD]->enqueue({"command" => "play", "path" => $playing_params[PLAYING_ALBUM]->{"paths_array_ref"}->[$playing_params[PLAYING_ALBUM]->{"track"}]});
+  $audio_q[TO_THREAD]->enqueue(shared_clone({"command" => "play", "path" => $playing_params[PLAYING_ALBUM]->{"paths_array_ref"}->[$playing_params[PLAYING_ALBUM]->{"track"}]}));
   $playing_params[PLAYING_ALBUM]->{"paused"} = 0;
   update_album_playing();
 }
@@ -795,7 +795,7 @@ sub album_prev_track {
     }
   }
   $playing_params[PLAYING_ALBUM]->{"track"} = $current unless ($playing_params[PLAYING_ALBUM]->{"track"});                       # if we found another track to play
-  $audio_q[TO_THREAD]->enqueue({"command" => "play", "path" => $playing_params[PLAYING_ALBUM]->{"paths_array_ref"}->[$playing_params[PLAYING_ALBUM]->{"track"}]});
+  $audio_q[TO_THREAD]->enqueue(shared_clone({"command" => "play", "path" => $playing_params[PLAYING_ALBUM]->{"paths_array_ref"}->[$playing_params[PLAYING_ALBUM]->{"track"}]}));
   update_album_playing();
 }
 
@@ -813,16 +813,15 @@ sub album_next_track {
     }
   }
   if ($playing_params[PLAYING_ALBUM]->{"track"}) {                       # if we found another track to play
-    $audio_q[TO_THREAD]->enqueue({"command" => "play", "path" => $playing_params[PLAYING_ALBUM]->{"paths_array_ref"}->[$playing_params[PLAYING_ALBUM]->{"track"}]});
+    $audio_q[TO_THREAD]->enqueue(shared_clone({"command" => "play", "path" => $playing_params[PLAYING_ALBUM]->{"paths_array_ref"}->[$playing_params[PLAYING_ALBUM]->{"track"}]}));
     update_album_playing();
   }
 }
 
 #----------------------------------------------------------------------------------------------------------------------
 sub display_ha {
-#  clear_display_area(0);
   set_display_mode(DISPLAY_HA);
-#  display_home_assistant($mqtt_data_ref, 1);
+  display_home_assistant($mqtt_data_ref, 1);
 }
 
 #----------------------------------------------------------------------------------------------------------------------
@@ -856,6 +855,7 @@ sub display_artists_by_letter {
 
 #----------------------------------------------------------------------------------------------------------------------
 init_fb();
+turn_display_on();
 
 print_footer(\@footer_names, \%footer_callbacks);
 set_display_mode(DISPLAY_SLIDESHOW);
@@ -864,7 +864,7 @@ $pids{"GatherPictures"} = threads->create(sub {
   #$path_to_pictures = "/mnt/shared/Media/My Pictures/1963";
   while (1) {
     print_error("Starting gathering pictures");
-    $pictures_q->enqueue(Gather::gather_pictures($path_to_pictures));
+    $pictures_q->enqueue(shared_clone(Gather::gather_pictures($path_to_pictures)));
     print_error("Finishing gathering pictures");
     sleep 60 * 60 * 24; # once a day
   };
@@ -899,7 +899,7 @@ $pids{"http"} = threads->create(sub{
         "id" => $$message{"id"},
         "url" => $$message{"url"}
       );
-      $http_q[FROM_THREAD]->enqueue(\%response);
+      $http_q[FROM_THREAD]->enqueue(shared_clone(\%response));
     }
     if ($$message{"command"} eq "get_thumb") {
       my ($image, $id) = ($$message{"image"}, $$message{"id"});
@@ -912,7 +912,7 @@ $pids{"http"} = threads->create(sub{
           "id" => $id,
           "url" => $url
         );
-        $http_q[FROM_THREAD]->enqueue(\%response);
+        $http_q[FROM_THREAD]->enqueue(shared_clone(\%response));
         return;
       }
       #print_error "Getting thumbnail file from $url";
@@ -924,7 +924,7 @@ $pids{"http"} = threads->create(sub{
           "id" => $id,
           "url" => $url
         );
-        $http_q[FROM_THREAD]->enqueue(\%response);
+        $http_q[FROM_THREAD]->enqueue(shared_clone(\%response));
       });
     }
   }
@@ -935,6 +935,15 @@ $pids{"HealthCheck"} = threads->create(sub{                    # ping to healthc
     sleep(60);
     my @res = system("/bin/bash -c 'curl $health_check_url' > /dev/null 2>&1");
   }
+})->detach();
+
+$pids{"MQTT"} = threads->create(sub{
+  #sleep(60);               # give time for MQTT server to start, should replace this with check for mqtt process later
+  while (1) {            # check for new MQTT messages 30s
+    #print_error("Checking for MQTT messages");
+    my $data_ref = MQTT::get_mqtt_values();
+    $mqtt_q[FROM_THREAD]->enqueue(shared_clone($data_ref));
+  };
 })->detach();
 
 Glib::Timeout->add(500, sub {                         # check every 500ms for new pictures list
@@ -977,38 +986,27 @@ Glib::Timeout->add(100, sub {                         # check every 100ms for ht
   return 1;                 # Continue the timeout
 });
 
-=for comment
-
-$pids{"MQTT"} = spawn {
-  my $running = 0;
-  sleep(60);               # give time for MQTT server to start, should replace this with check for mqtt process later
-  Event->timer(interval => 30, cb => sub {            # check for new MQTT messages 30s
-    return if ($running);
-    $running = 1;
-    #print_error("Checking for MQTT messages");
-    my $data_ref = MQTT::get_mqtt_values();
-    #print_hash_params($data_ref);
-    snd(0, "mqtt", $data_ref); 
-    $running = 0;
-  });
-  receive {
-  };
-};
-
-receive {
-  msg "response" => sub {
-    call_callback(@_);
-  };
-  msg "mqtt" => sub {
-    my ($from, $data_ref) = @_;
-    #print_hash_params($data_ref);
-    $mqtt_data_ref = $data_ref;
-    if ($mode_display_area == DISPLAY_HA) {
-      display_home_assistant($data_ref, 0);
+Glib::Timeout->add(1000, sub {                         # check every 1s for mqtt responses
+  while ($mqtt_data_ref = shared_clone($mqtt_q[FROM_THREAD]->dequeue_nb())) {
+    print_error("Received MQTT data");
+    if (($mode_display_area == DISPLAY_HA) && (keys %$mqtt_data_ref)) {
+      display_home_assistant($mqtt_data_ref, 0);
     }
-  };
-};
-=cut
+  }
+  return 1;                 # Continue the timeout
+});
+
+Glib::Timeout->add(60 * 10 * 1000, sub {              # check every 10mins, turn display on/off depending on yaml schedule
+  my $hour = (localtime())[2];
+  #print_error("backlight event at $hour");
+  if ($hour == $$display_times_ref{"off-time"}) {
+    turn_display_off();
+  }
+  if ($hour == $$display_times_ref{"on-time"}) {
+    turn_display_on();
+  }
+  return 1;
+});
 
 print_error("Starting graphics");
 start_graphics();

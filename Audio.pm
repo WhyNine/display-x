@@ -14,15 +14,17 @@ use UserDetails qw ( $jellyfin_url );
 use Audio::Play::MPG123;
 use File::Basename;
 use threads;
+use threads::shared;
 use Thread::Queue;
-use Glib;
+#use Glib;
 
 my $player;
 my $vlc_playing = 0;
 my $message_poll;
 my $polling = 0;
 
-our @audio_q = (Thread::Queue->new, Thread::Queue->new);  # to/from queues for audio messages (to = to audio thread, from = from audio thread)
+our @audio_q : shared;
+@audio_q = (Thread::Queue->new, Thread::Queue->new);  # to/from queues for audio messages (to = to audio thread, from = from audio thread)
 
 sub player_poll {
   $player->poll(0) if $player;
@@ -47,7 +49,7 @@ sub audio_init {
     player_poll();
     return 1 if audio_state();                  # return if playing or paused
     audio_stop();
-    $audio_q[1]->enqueue("play_stopped");
+    $audio_q[1]->enqueue(shared_clone("play_stopped"));
     return 1;
   });
 }

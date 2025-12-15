@@ -60,7 +60,7 @@ sub turn_display_off {
 }
 
 sub turn_display_on {
-  `sudo echo 2 > /sys/class/backlight/10-0045/brightness`;
+  `sudo echo 20 > /sys/class/backlight/10-0045/brightness`;
 }
 
 sub write_data_to_file {
