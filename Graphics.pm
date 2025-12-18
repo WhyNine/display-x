@@ -945,9 +945,6 @@ sub display_solar {
   my $solar_box;
   if (($force_display) || (!defined $solar_box)) {
     $solar_box = Gtk3::Box->new('horizontal', 0);
-    #Glib::Object::Introspection->invoke (
-    #    'GObject', 'Object', 'ref_sink', $solar_box
-    #);
     add_style_class($solar_box, 'solar-top-box-style');
   }
   my $vale = $data_ref->{return_solar_exported()};
@@ -956,47 +953,45 @@ sub display_solar {
   my $valbatt = $data_ref->{return_solar_battery()};
   #print_error("Solar values: exported=$vale, bat power=$valbp, solar power=$valsp");
   changed(\@old_values, $vale, $valbp, $valsp, $valbatt);
-#  if (changed(\@old_values, $vale, $valbp, $valsp, $valbatt) || $force_display) {
-    $vale = $old_values[0];
-    $valbp = $old_values[1];
-    $valsp = $old_values[2];
-    $valbatt = $old_values[3];
-    delete_all_children($solar_box);
-    my $solar_slice_box = Gtk3::Box->new('vertical', 0);
-    add_style_class($solar_slice_box, 'solar-slice-box-style');
-    my $title_box = Gtk3::Label->new("Solar");
-    add_style_class($title_box, 'ha-title-text-style');
-    $title_box->set_halign('start');
-    $solar_slice_box->pack_start($title_box, 0, 0, 0);
-    my $battery_slice = draw_slice_widget($valbatt, "large", "Battery");
-    add_style_class($battery_slice, 'solar-slice-widget-style');
-    $solar_slice_box->pack_start($battery_slice, 0, 0, 0);
-    $solar_box->pack_start($solar_slice_box, 0, 0, 0);
-    my $gen_str = defined $valsp ? format_number($valsp) . "W" : "N/A";
-    my $imp_exp_str;
-    my $ie_val_str;
-    if (defined $vale) {
-      if ($vale < 0) {
-        $imp_exp_str = "Importing";
-        $ie_val_str = format_number(-$vale) . "W";
-      } else {
-        $imp_exp_str = "Exporting";
-        $ie_val_str = format_number($vale) . "W";
-      }
+  $vale = $old_values[0];
+  $valbp = $old_values[1];
+  $valsp = $old_values[2];
+  $valbatt = $old_values[3];
+  delete_all_children($solar_box);
+  my $solar_slice_box = Gtk3::Box->new('vertical', 0);
+  add_style_class($solar_slice_box, 'solar-slice-box-style');
+  my $title_box = Gtk3::Label->new("Solar");
+  add_style_class($title_box, 'ha-title-text-style');
+  $title_box->set_halign('start');
+  $solar_slice_box->pack_start($title_box, 0, 0, 0);
+  my $battery_slice = draw_slice_widget($valbatt, "large", "Battery");
+  add_style_class($battery_slice, 'solar-slice-widget-style');
+  $solar_slice_box->pack_start($battery_slice, 0, 0, 0);
+  $solar_box->pack_start($solar_slice_box, 0, 0, 0);
+  my $gen_str = defined $valsp ? format_number($valsp) . "W" : "N/A";
+  my $imp_exp_str;
+  my $ie_val_str;
+  if (defined $vale) {
+    if ($vale < 0) {
+      $imp_exp_str = "Importing";
+      $ie_val_str = format_number(-$vale) . "W";
     } else {
-      $imp_exp_str = "Importing/Exporting";
-      $ie_val_str = "N/A";
+      $imp_exp_str = "Exporting";
+      $ie_val_str = format_number($vale) . "W";
     }
-    my $cons_str;
-    if (defined $valsp && defined $valbp && defined $vale) {
-      my $valc = $valsp - $valbp - $vale;
-      $cons_str = format_number($valc) . "W";
-    } else {
-      $cons_str = "N/A";
-    }
-    my $params_box = ha_create_params_box("Generating", $gen_str, $imp_exp_str, $ie_val_str, "Consuming", $cons_str);
-    $solar_box->pack_end($params_box, 0, 0, 0);
-#  }
+  } else {
+    $imp_exp_str = "Importing/Exporting";
+    $ie_val_str = "N/A";
+  }
+  my $cons_str;
+  if (defined $valsp && defined $valbp && defined $vale) {
+    my $valc = $valsp - $valbp - $vale;
+    $cons_str = format_number($valc) . "W";
+  } else {
+    $cons_str = "N/A";
+  }
+  my $params_box = ha_create_params_box("Generating", $gen_str, $imp_exp_str, $ie_val_str, "Consuming", $cons_str);
+  $solar_box->pack_end($params_box, 0, 0, 0);
   return $solar_box;
 }
 
@@ -1015,28 +1010,27 @@ sub display_car {
   my $valbatt = $data_ref->{return_car_battery()};
   #print_error("range=$valr, time=$valct, plug=$valpi");
   changed(\@old_values, $valr, $valct, $valpi, $valbatt);
-#  if (changed(\@old_values, $valr, $valct, $valpi, $valbatt) || $force_display) {
-    $valr = $old_values[0];
-    $valct = $old_values[1];
-    $valpi = $old_values[2];
-    $valbatt = $old_values[3];
-    delete_all_children($car_box);
-    my $car_slice_box = Gtk3::Box->new('vertical', 0);
-    add_style_class($car_slice_box, 'car-slice-box-style');
-    my $title_box = Gtk3::Label->new("Car");
-    add_style_class($title_box, 'ha-title-text-style');
-    $title_box->set_halign('start');
-    $car_slice_box->pack_start($title_box, 0, 0, 0);
-    my $battery_slice = draw_slice_widget($valbatt, "large", "Battery");
-    add_style_class($battery_slice, 'car-slice-widget-style');
-    $car_slice_box->pack_start($battery_slice, 0, 0, 0);
-    $car_box->pack_start($car_slice_box, 0, 0, 0);
-    $valr = int($valr * 5 / 8) . " miles" if defined $valr;
-    $valct = sprintf("%.1f hours", $valct / 60) if defined $valct;
-    $valpi = (($valpi eq "off") ? "No" : "Yes") if defined $valpi;
-    my $params_box = ha_create_params_box("Range", $valr, "Charge time", $valct, "Plugged in", $valpi);
-    $car_box->pack_end($params_box, 0, 0, 0);
-#  }
+  $valr = $old_values[0];
+  $valct = $old_values[1];
+  $valpi = $old_values[2];
+  $valbatt = $old_values[3];
+  $valct = (defined $valct) ? $valct : "--";
+  delete_all_children($car_box);
+  my $car_slice_box = Gtk3::Box->new('vertical', 0);
+  add_style_class($car_slice_box, 'car-slice-box-style');
+  my $title_box = Gtk3::Label->new("Car");
+  add_style_class($title_box, 'ha-title-text-style');
+  $title_box->set_halign('start');
+  $car_slice_box->pack_start($title_box, 0, 0, 0);
+  my $battery_slice = draw_slice_widget($valbatt, "large", "Battery");
+  add_style_class($battery_slice, 'car-slice-widget-style');
+  $car_slice_box->pack_start($battery_slice, 0, 0, 0);
+  $car_box->pack_start($car_slice_box, 0, 0, 0);
+  $valr = int($valr * 5 / 8) . " miles" if defined $valr;
+  $valct = sprintf("%.1f hours", $valct / 60) if defined $valct;
+  $valpi = (($valpi eq "off") ? "No" : "Yes") if defined $valpi;
+  my $params_box = ha_create_params_box("Range", $valr, "Charge time", $valct, "Plugged in", $valpi);
+  $car_box->pack_end($params_box, 0, 0, 0);
   return $car_box;
 }
 
@@ -1054,23 +1048,21 @@ sub display_printer {
   my $valy = $data_ref->{return_ink_yellow()};
   my $valb = $data_ref->{return_ink_black()};
   changed(\@old_values, $valm, $valc, $valy, $valb);
-#  if (changed(\@old_values, $valm, $valc, $valy, $valb) || $force_display) {
-    my $valm = $old_values[0];
-    my $valc = $old_values[1];
-    my $valy = $old_values[2];
-    my $valb = $old_values[3];
-    delete_all_children($printer_box);
-    my $title_box = Gtk3::Label->new("Printer");
-    add_style_class($title_box, 'ha-title-text-style');
-    $title_box->set_valign('start');
-    $printer_box->pack_start($title_box, 0, 0, 0);
-    foreach my $color (["Magenta", $valm], ["Cyan", $valc], ["Yellow", $valy], ["Black", $valb]) {
-      my $slice = draw_slice_widget($color->[1], "small", $color->[0]);
-      $slice->set_valign('end');
-      add_style_class($slice, 'printer-slice-widget-style');
-      $printer_box->pack_start($slice, 0, 0, 0);
-    }
-#  }
+  my $valm = $old_values[0];
+  my $valc = $old_values[1];
+  my $valy = $old_values[2];
+  my $valb = $old_values[3];
+  delete_all_children($printer_box);
+  my $title_box = Gtk3::Label->new("Printer");
+  add_style_class($title_box, 'ha-title-text-style');
+  $title_box->set_valign('start');
+  $printer_box->pack_start($title_box, 0, 0, 0);
+  foreach my $color (["Magenta", $valm], ["Cyan", $valc], ["Yellow", $valy], ["Black", $valb]) {
+    my $slice = draw_slice_widget($color->[1], "small", $color->[0]);
+    $slice->set_valign('end');
+    add_style_class($slice, 'printer-slice-widget-style');
+    $printer_box->pack_start($slice, 0, 0, 0);
+  }
   return $printer_box;
 }
 
@@ -1095,29 +1087,6 @@ sub display_home_assistant {
   $top_box->pack_start($printer_box, 0, 0, 0);
   $window->show_all;
 }
-
-#----------------------------------------------------------------------------------------------------------------------
-
-=for comment
-# --- 2. Create Content Box 1 ---
-my $box1 = Gtk3::Box->new('vertical', 10);
-$box1->set_border_width(10);
-$box1->add(Gtk3::Label->new("--- Box 1: Data Entry View ---"));
-$box1->add(Gtk3::Button->new('Button A: Enter Data'));
-
-# --- 3. Create Content Box 2 ---
-my $box2 = Gtk3::Box->new('vertical', 10);
-$box2->set_border_width(10);
-$box2->add(Gtk3::Label->new("--- Box 2: Display View ---"));
-$box2->add(Gtk3::Button->new('Button B: View Log'));
-
-# --- 4. Add Boxes to the Stack ---
-# The second parameter is the name/ID, and the third is the user-friendly title.
-$stack->add_named($box1, 'page_one', 'Page One');
-$stack->add_named($box2, 'page_two', 'Page Two');
-
-$stack->set_visible_child_name('page_two');
-=cut
 
 
 1;

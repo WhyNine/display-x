@@ -6,11 +6,10 @@ use v5.28;
 use lib "/home/pi/display";
 use Gather;
 use Graphics;
-use UserDetails qw ( $path_to_pictures $health_check_url $radio_stations_ref $jellyfin_url $jellyfin_apikey $display_times_ref );
+use UserDetails qw ( $path_to_pictures $health_check_url $radio_stations_ref $jellyfin_url $jellyfin_apikey $display_times_ref $mqtt_ref );
 use Utils;
 use Http;
 use Audio;
-use Photos;
 use MQTT;
 
 use Gtk3 -init;
@@ -174,7 +173,6 @@ sub transport_play {
   print_error("transport play");
   $playing_params[$mode_playing_area]->{"paused"} = 0;
   $playing_params[$mode_playing_area]->{"update_fn"}->();
-  #update_playlist_playing();
 }
 
 #----------------------------------------------------------------------------------------------------------------------
@@ -543,7 +541,6 @@ sub gather_music {
   }
   print_error("Start gathering music");
   %thumbnails = ();
-  #get_json("/playlists", sub {parse_error() if !process_playlists_top(@_);});
   get_json("/Library/MediaFolders", sub {parse_error() if !process_library_sections(@_);});
 }
 
@@ -708,8 +705,6 @@ sub display_albums_by_letter {
     display_albums_top(\%albums_by_letter, \&display_albums_by_icon);
   } else {                                            # still waiting for album list to be compiled
     display_string("Please wait ...");
-    #my %tmp = ('A'=> undef, 'G'=> undef, 'H'=> undef, 'M'=> undef, 'N'=> undef, 'O'=> undef, 'P'=> undef, 'Q'=> undef, 'R'=> undef, 'S'=> undef, 'T'=> undef, '4'=> undef, '1'=> undef, '2'=> undef, '3'=> undef, 'B'=> undef, 'C'=> undef, 'D'=> undef, 'E'=> undef, 'F'=> undef, 'J'=> undef, 'K'=> undef, 'L'=> undef, 'I'=> undef, 'W'=> undef, '#'=> undef);
-    #display_albums_top(\%tmp, \&display_albums_by_icon)
   }
 }
 
@@ -861,7 +856,6 @@ print_footer(\@footer_names, \%footer_callbacks);
 set_display_mode(DISPLAY_SLIDESHOW);
 
 $pids{"GatherPictures"} = threads->create(sub {
-  #$path_to_pictures = "/mnt/shared/Media/My Pictures/1963";
   while (1) {
     print_error("Starting gathering pictures");
     $pictures_q->enqueue(shared_clone(Gather::gather_pictures($path_to_pictures)));
@@ -938,7 +932,9 @@ $pids{"HealthCheck"} = threads->create(sub{                    # ping to healthc
 })->detach();
 
 $pids{"MQTT"} = threads->create(sub{
-  #sleep(60);               # give time for MQTT server to start, should replace this with check for mqtt process later
+  while (!mosquitto_process_running($mqtt_ref->{'server'})) {
+    sleep(5);
+  }
   while (1) {            # check for new MQTT messages 30s
     #print_error("Checking for MQTT messages");
     my $data_ref = MQTT::get_mqtt_values();

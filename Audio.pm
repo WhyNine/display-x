@@ -16,7 +16,6 @@ use File::Basename;
 use threads;
 use threads::shared;
 use Thread::Queue;
-#use Glib;
 
 my $player;
 my $vlc_playing = 0;
@@ -64,7 +63,6 @@ sub audio_stop {
   print_error("audio stop");
   $player->stop() if $player;
   $polling = 0;
-  #$$poll_event_ref->stop() if $poll_event_ref;
 }
 
 # Note: Some folders include utf8 chars which aren't handled well by mpg123, so change to folder then play file to get round it
@@ -90,7 +88,6 @@ sub audio_play {
     } else {
       my ($filename, $folder, $suffix) = fileparse($path);
       chdir $folder;
-      #print_error($folder);
       if (!$player->load($filename)) {
         print_error("Unable to start playing track at $path");
       } else {
@@ -98,7 +95,6 @@ sub audio_play {
       }
     }
     $polling = 1;
-    #$$poll_event_ref->start();
   }
 }
 

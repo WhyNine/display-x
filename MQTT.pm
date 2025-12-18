@@ -1,7 +1,8 @@
 package MQTT;
 
 our @EXPORT = qw ( get_mqtt_values return_car_battery return_car_connected return_car_time return_solar_battery return_solar_power 
-  return_solar_exported return_solar_bat_power return_car_range return_ink_black return_ink_cyan return_ink_magenta return_ink_yellow @mqtt_q);
+  return_solar_exported return_solar_bat_power return_car_range return_ink_black return_ink_cyan return_ink_magenta return_ink_yellow 
+  @mqtt_q mosquitto_process_running);
 use base qw(Exporter);
 
 use strict;
@@ -16,6 +17,7 @@ use threads::shared;
 use Thread::Queue;
 use Net::MQTT::Simple;
 use Net::MQTT::Simple::Auth;
+use IO::Socket::INET;
 
 my @topics_subs = (\&return_car_battery, \&return_car_connected, \&return_car_range, \&return_car_time, \&return_solar_bat_power, \&return_solar_battery, \&return_solar_exported, 
   \&return_solar_power, \&return_ink_black, \&return_ink_cyan, \&return_ink_magenta, \&return_ink_yellow);
@@ -103,8 +105,25 @@ sub mqtt_server_address {
   return $ip;
 }
 
+sub mosquitto_process_running {
+  my $addr = shift;
+  my $socket = IO::Socket::INET->new(
+    PeerAddr => $addr,
+    PeerPort => 1883,
+    Proto    => 'tcp',
+    Timeout  => 1, # Don't wait long
+  );
+  if ($socket) {
+    close($socket);
+    return 1;
+  } else {
+    print_error("MQTT server at $addr not reachable on port 1883");
+    return 0;
+  }
+}
+
 sub check_mqtt_subscribed {
-  my $online = (my $server = mqtt_server_address());
+  my $online = (my $server = 'mqtt_server_address()');
   while (!$online) {
     print_error("Unable to ping MQTT server " . $mqtt_ref->{'server'});
     $mqtt_instance->disconnect() if $mqtt_instance;
