@@ -125,7 +125,7 @@ sub check_mqtt_subscribed {
       my $topic = $topic_sub->();
       push @topics, $topic;
       print_error("Registering subscription for $topic");
-      #my $cv = $mqtt_instance->subscribe($topic, \&rcv_msg);
+      $mqtt_instance->subscribe($topic, \&rcv_msg);
     }
     $subscribed = 1;
   }
@@ -139,7 +139,6 @@ sub get_mqtt_values {
   foreach my $topic (keys %data) {
     $data_ref{$topic} = $data{$topic};
   }
-  #print_hash_params($data_ref);
   return \%data_ref;
 }
 

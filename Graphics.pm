@@ -842,8 +842,6 @@ sub changed {
 
 sub draw_gauge {
   my ($widget, $cr, $data) = @_;
-  print_error("Drawing gauge with data: $data");
-  
   # Get the width and height of the drawing area
   my $width  = $widget->get_allocated_width;
   my $height = $widget->get_allocated_height;
@@ -857,69 +855,112 @@ sub draw_gauge {
   
   # Radians for the semi-circle (0 to pi)
   # Start: 180 degrees (left), End: 0 degrees (right)
-  my $START_ANGLE = M_PI; # 3.14159...
+  my $START_ANGLE = M_PI;
   my $END_ANGLE   = 0;
   
   # Calculate the angle for the value
   my $normalized_value = $data / 100;
   # The value arc goes from 180 degrees (START_ANGLE) down to the calculated angle
-  my $value_angle = $START_ANGLE - ($normalized_value * $START_ANGLE);
+  my $value_angle = $START_ANGLE + ($normalized_value * M_PI);
   
   # --- Cairo Setup for Drawing ---
   $cr->set_line_cap('butt');
   $cr->set_line_width($line_width);
 
   # 1. Draw the Background Arc (Full Semicircle)
-  $cr->set_source_rgb(defined $data ? @pale_yellow : @gray);
+  $cr->set_source_rgb(defined $data ? @dark_green : @gray);
   $cr->arc($center_x, $center_y, $radius_outer - ($line_width/2), 
             $START_ANGLE, $END_ANGLE);
   $cr->stroke();
 
   # 2. Draw the Value Arc (Green Filled Portion)
-  $cr->set_source_rgb(defined $data ? @dark_green : @gray);
+  $cr->set_source_rgb(defined $data ? @pale_yellow : @gray);
   $cr->arc($center_x, $center_y, $radius_outer - ($line_width/2), 
             $START_ANGLE, $value_angle);
   $cr->stroke();
+
+  if ($height > 60) {
+    my $text = sprintf("%.0f%%", $data);
+    $cr->select_font_face("Sans", 'normal', 'normal');
+    $cr->set_font_size(25);                           # Choose a readable size
+    my $extents = $cr->text_extents($text);           # This returns: x_bearing, y_bearing, width, height, x_advance, y_advance
+    my $t_width  = $extents->{width};
+    my $t_height = $extents->{height};
+    my $tx = $center_x - ($t_width / 2) - $extents->{x_bearing};
+    my $ty = $center_y - ($radius_inner / 5);                     # Adjust the '3' to move it up or down inside the arc
+    $cr->set_source_rgb(@pale_yellow);
+    $cr->move_to($tx + 2, $ty + 2);
+    $cr->show_text($text);
+  }
 }
 
 sub draw_slice_widget {
   my ($data, $size, $title) = @_;
-  print_error("Drawing slice widget of size $size with title $title and data: $data");
+  #print_error("Drawing slice widget of size $size with title $title and data: $data");
   my $vbox = Gtk3::Box->new('vertical', 0);
   my $drawing_area = Gtk3::DrawingArea->new();
+  $drawing_area->set_halign('center');
   $vbox->pack_start($drawing_area, 0, 0, 0);
   $drawing_area->signal_connect('draw' => sub {      # Connect the drawing function to the 'draw' signal
     my ($widget, $context) = @_;
-    print_error("Slice widget draw signal called with data: $data");
     draw_gauge($widget, $context, $data);
   });
   if ($size eq "small") {
-    $drawing_area->set_size_request(80, 60);
+    $drawing_area->set_size_request(80, 40);
   } elsif ($size eq "large") {
-    $drawing_area->set_size_request(200, 150);
-    my $title_box = Gtk3::Label->new($title);
-    add_style_class($title_box, 'slice-widget-title-style');
-    $title_box->set_halign('center');
-    $vbox->pack_start($title_box, 0, 0, 0);
+    $drawing_area->set_size_request(200, 100);
   }
-  print_error("Finished drawing slice widget");
+  my $title_box = Gtk3::Label->new($title);
+  add_style_class($title_box, 'slice-widget-title-style');
+  $title_box->set_halign('center');
+  $vbox->pack_start($title_box, 0, 0, 0);
   return $vbox;
+}
+
+sub ha_create_params_box {
+  my @data = @_;
+  my $params_box = Gtk3::Grid->new();
+  add_style_class($params_box, 'ha-params-top-box-style');
+  $params_box->set_valign('center');
+  foreach my $i (0 .. 2) {
+    my $label = shift @data;
+    my $value = shift @data;
+    my $label_box = Gtk3::Label->new("$label:");
+    add_style_class($label_box, 'ha-param-label-style');
+    $label_box->set_halign('end');
+    my $value_box = Gtk3::Label->new("$value");
+    add_style_class($value_box, 'ha-param-value-style');
+    $value_box->set_halign('start');
+    $value_box->set_xalign(0.0);
+    $value_box->set_size_request(130, -1);
+    $params_box->attach($label_box, 0, $i, 1, 1);
+    $params_box->attach($value_box, 1, $i, 1, 1);}
+  return $params_box;
 }
 
 # solar parameters
 sub display_solar {
   my ($data_ref, $force_display) = @_;
   state @old_values;
-  state $solar_box;
+  my $solar_box;
   if (($force_display) || (!defined $solar_box)) {
     $solar_box = Gtk3::Box->new('horizontal', 0);
+    #Glib::Object::Introspection->invoke (
+    #    'GObject', 'Object', 'ref_sink', $solar_box
+    #);
     add_style_class($solar_box, 'solar-top-box-style');
   }
   my $vale = $data_ref->{return_solar_exported()};
   my $valbp = $data_ref->{return_solar_bat_power()};
   my $valsp = $data_ref->{return_solar_power()};
-  print_error("Solar values: exported=$vale, bat power=$valbp, solar power=$valsp");
-  if (changed(\@old_values, $vale, $valbp, $valsp) || $force_display) {
+  my $valbatt = $data_ref->{return_solar_battery()};
+  #print_error("Solar values: exported=$vale, bat power=$valbp, solar power=$valsp");
+  changed(\@old_values, $vale, $valbp, $valsp, $valbatt);
+#  if (changed(\@old_values, $vale, $valbp, $valsp, $valbatt) || $force_display) {
+    $vale = $old_values[0];
+    $valbp = $old_values[1];
+    $valsp = $old_values[2];
+    $valbatt = $old_values[3];
     delete_all_children($solar_box);
     my $solar_slice_box = Gtk3::Box->new('vertical', 0);
     add_style_class($solar_slice_box, 'solar-slice-box-style');
@@ -927,84 +968,35 @@ sub display_solar {
     add_style_class($title_box, 'ha-title-text-style');
     $title_box->set_halign('start');
     $solar_slice_box->pack_start($title_box, 0, 0, 0);
-    my $battery_slice = draw_slice_widget($data_ref->{return_solar_battery()}, "large", "Battery");
+    my $battery_slice = draw_slice_widget($valbatt, "large", "Battery");
     add_style_class($battery_slice, 'solar-slice-widget-style');
     $solar_slice_box->pack_start($battery_slice, 0, 0, 0);
     $solar_box->pack_start($solar_slice_box, 0, 0, 0);
-    my $params_box = Gtk3::Box->new('vertical', 0);
-    add_style_class($params_box, 'solar-params-box-style');
     my $gen_str = defined $valsp ? format_number($valsp) . "W" : "N/A";
-    my $gen_box = Gtk3::Label->new("Generating: $gen_str");
-    add_style_class($gen_box, 'ha-param-text-style');
-    $gen_box->set_halign('start');
-    $params_box->pack_start($gen_box, 0, 0, 0);
     my $imp_exp_str;
+    my $ie_val_str;
     if (defined $vale) {
       if ($vale < 0) {
-        $imp_exp_str = "Importing: " . format_number(-$vale) . "W";
+        $imp_exp_str = "Importing";
+        $ie_val_str = format_number(-$vale) . "W";
       } else {
-        $imp_exp_str = "Exporting: " . format_number($vale) . "W";
+        $imp_exp_str = "Exporting";
+        $ie_val_str = format_number($vale) . "W";
       }
     } else {
-      $imp_exp_str = "Importing/Exporting: N/A";
+      $imp_exp_str = "Importing/Exporting";
+      $ie_val_str = "N/A";
     }
-    my $imp_exp_box = Gtk3::Label->new($imp_exp_str);
-    add_style_class($imp_exp_box, 'ha-param-text-style');
-    $params_box->pack_start($imp_exp_box, 0, 0, 0);
     my $cons_str;
     if (defined $valsp && defined $valbp && defined $vale) {
       my $valc = $valsp - $valbp - $vale;
-      $cons_str = "Consuming: " . format_number($valc) . "W";
+      $cons_str = format_number($valc) . "W";
     } else {
-      $cons_str = "Consuming: N/A";
+      $cons_str = "N/A";
     }
-    my $cons_box = Gtk3::Label->new($cons_str);
-    add_style_class($cons_box, 'ha-param-text-style');
-    $params_box->pack_start($cons_box, 0, 0, 0);
+    my $params_box = ha_create_params_box("Generating", $gen_str, $imp_exp_str, $ie_val_str, "Consuming", $cons_str);
     $solar_box->pack_end($params_box, 0, 0, 0);
-  }
-
-=for comment
-  if (changed(\@old_values, $vale, $valbp, $valsp) || $force_display) {
-    $fb->clip_reset();
-    $fb->set_color($black);
-    $fb->rbox({                  # clear the solar area
-      'x'          => 0,
-      'y'          => 120,
-      'width'      => WIDTH,
-      'height'     => 340 - 120,
-      'radius'     => 0,
-      'pixel_size' => 1,
-      'filled'     => 1
-    });
-    draw_slice($data_ref->{return_solar_battery()}, 120, 290, "large", "Battery");
-    display_ha_title(200, "Solar");
-    my $valc;
-    if (defined($valsp) && defined($valbp) && defined($vale)) {
-      $valc = $valsp - $valbp - $vale;
-      $valc = format_number($valc) . "W";
-    }
-    $valsp = format_number($valsp) . "W" if defined $valsp;
-    display_ha_param(280, 210, "Generating", $valsp);
-    if ($vale < 0) {
-      $vale = format_number(-$vale) . "W" if defined $vale;
-      display_ha_param(280, 265, "Importing", $vale);
-    } else {
-      $vale = format_number($vale) . "W" if defined $vale;
-      display_ha_param(280, 265, "Exporting", $vale);
-    }
-    display_ha_param(280, 320, "Consuming", $valc);
-    $fb->clip_reset();
-    $fb->set_color($yellow);
-    $fb->line({
-      'x'           => 0,
-      'y'           => 340,
-      'xx'          => WIDTH,
-      'yy'          => 340,
-      'pixel_size'  => 2
-    });
-  }
-=cut
+#  }
   return $solar_box;
 }
 
@@ -1012,98 +1004,73 @@ sub display_solar {
 sub display_car {
   my ($data_ref, $force_display) = @_;
   state @old_values;
-  state $car_box;
+  my $car_box;
   if (($force_display) || (!defined $car_box)) {
     $car_box = Gtk3::Box->new('horizontal', 0);
-    add_style_class($car_box, 'solar-top-box-style');
+    add_style_class($car_box, 'car-top-box-style');
   }
   my $valr = $data_ref->{return_car_range()};
   my $valct = $data_ref->{return_car_time()};
   my $valpi = $data_ref->{return_car_connected()};
-  print_error("range=$valr, time=$valct, plug=$valpi");
-=for comment
-  if (changed(\@old_values, $valr, $valct, $valpi) || $force_display) {
-    $fb->clip_reset();
-    $fb->set_color($black);
-    $fb->rbox({                          # clear the car area
-      'x'          => 0,
-      'y'          => 342,
-      'width'      => WIDTH,
-      'height'     => 559 - 342,
-      'radius'     => 0,
-      'pixel_size' => 1,
-      'filled'     => 1
-    });
-    draw_slice($data_ref->{return_car_battery()}, 120, 510, "large", "Battery");
-    display_ha_title(420, "Car");
+  my $valbatt = $data_ref->{return_car_battery()};
+  #print_error("range=$valr, time=$valct, plug=$valpi");
+  changed(\@old_values, $valr, $valct, $valpi, $valbatt);
+#  if (changed(\@old_values, $valr, $valct, $valpi, $valbatt) || $force_display) {
+    $valr = $old_values[0];
+    $valct = $old_values[1];
+    $valpi = $old_values[2];
+    $valbatt = $old_values[3];
+    delete_all_children($car_box);
+    my $car_slice_box = Gtk3::Box->new('vertical', 0);
+    add_style_class($car_slice_box, 'car-slice-box-style');
+    my $title_box = Gtk3::Label->new("Car");
+    add_style_class($title_box, 'ha-title-text-style');
+    $title_box->set_halign('start');
+    $car_slice_box->pack_start($title_box, 0, 0, 0);
+    my $battery_slice = draw_slice_widget($valbatt, "large", "Battery");
+    add_style_class($battery_slice, 'car-slice-widget-style');
+    $car_slice_box->pack_start($battery_slice, 0, 0, 0);
+    $car_box->pack_start($car_slice_box, 0, 0, 0);
     $valr = int($valr * 5 / 8) . " miles" if defined $valr;
     $valct = sprintf("%.1f hours", $valct / 60) if defined $valct;
     $valpi = (($valpi eq "off") ? "No" : "Yes") if defined $valpi;
-    display_ha_param(280, 430, "Range", $valr);
-    display_ha_param(280, 485, "Charge time", $valct);
-    display_ha_param(280, 540, "Plugged in", $valpi);
-    $fb->set_color($yellow);
-    $fb->line({
-      'x'           => 0,
-      'y'           => 340,
-      'xx'          => WIDTH,
-      'yy'          => 340,
-      'pixel_size'  => 2
-    });
-    $fb->line({
-      'x'           => 0,
-      'y'           => 560,
-      'xx'          => WIDTH,
-      'yy'          => 560,
-      'pixel_size'  => 2
-    });
-  }
-=cut
+    my $params_box = ha_create_params_box("Range", $valr, "Charge time", $valct, "Plugged in", $valpi);
+    $car_box->pack_end($params_box, 0, 0, 0);
+#  }
   return $car_box;
 }
 
 # printer ink statuses
 sub display_printer {
   my ($data_ref, $force_display) = @_;
-  state $printer_box;
+  my $printer_box;
   state @old_values;
   if (($force_display) || (!defined $printer_box)) {
     $printer_box = Gtk3::Box->new('horizontal', 0);
-    add_style_class($printer_box, 'solar-top-box-style');
+    add_style_class($printer_box, 'printer-top-box-style');
   }
   my $valm = $data_ref->{return_ink_magenta()};
   my $valc = $data_ref->{return_ink_cyan()};
   my $valy = $data_ref->{return_ink_yellow()};
   my $valb = $data_ref->{return_ink_black()};
-=for comment
-  if (changed(\@old_values, $valm, $valc, $valy, $valb) || $force_display) {
-    $fb->clip_reset();
-    $fb->set_color($black);
-    $fb->rbox({                    #clear the printer area
-      'x'          => 0,
-      'y'          => 560,
-      'width'      => WIDTH,
-      'height'     => 657 - 560,
-      'radius'     => 0,
-      'pixel_size' => 1,
-      'filled'     => 1
-    });
-    display_ha_title(650, "Printer");
-    draw_slice($data_ref->{return_ink_magenta()}, 270, 615, "small", "Magenta");
-    draw_slice($data_ref->{return_ink_cyan()}, 400, 615, "small", "Cyan");
-    draw_slice($data_ref->{return_ink_yellow()}, 530, 615, "small", "Yellow");
-    draw_slice($data_ref->{return_ink_black()}, 660, 615, "small", "Black");
-    $fb->clip_reset();
-    $fb->set_color($yellow);
-    $fb->line({
-      'x'           => 0,
-      'y'           => 560,
-      'xx'          => WIDTH,
-      'yy'          => 560,
-      'pixel_size'  => 2
-    });
-  }
-=cut
+  changed(\@old_values, $valm, $valc, $valy, $valb);
+#  if (changed(\@old_values, $valm, $valc, $valy, $valb) || $force_display) {
+    my $valm = $old_values[0];
+    my $valc = $old_values[1];
+    my $valy = $old_values[2];
+    my $valb = $old_values[3];
+    delete_all_children($printer_box);
+    my $title_box = Gtk3::Label->new("Printer");
+    add_style_class($title_box, 'ha-title-text-style');
+    $title_box->set_valign('start');
+    $printer_box->pack_start($title_box, 0, 0, 0);
+    foreach my $color (["Magenta", $valm], ["Cyan", $valc], ["Yellow", $valy], ["Black", $valb]) {
+      my $slice = draw_slice_widget($color->[1], "small", $color->[0]);
+      $slice->set_valign('end');
+      add_style_class($slice, 'printer-slice-widget-style');
+      $printer_box->pack_start($slice, 0, 0, 0);
+    }
+#  }
   return $printer_box;
 }
 
@@ -1126,9 +1093,7 @@ sub display_home_assistant {
   my $sep2 = construct_horizontal_separator(2);
   $top_box->pack_start($sep2, 0, 0, 0);
   $top_box->pack_start($printer_box, 0, 0, 0);
-  print_error("Finished displaying home assistant");
   $window->show_all;
-  print_error("Window shown");
 }
 
 #----------------------------------------------------------------------------------------------------------------------

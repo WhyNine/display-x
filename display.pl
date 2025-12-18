@@ -942,7 +942,7 @@ $pids{"MQTT"} = threads->create(sub{
   while (1) {            # check for new MQTT messages 30s
     #print_error("Checking for MQTT messages");
     my $data_ref = MQTT::get_mqtt_values();
-    $mqtt_q[FROM_THREAD]->enqueue(shared_clone($data_ref));
+    $mqtt_q[FROM_THREAD]->enqueue($data_ref);
   };
 })->detach();
 
@@ -987,8 +987,8 @@ Glib::Timeout->add(100, sub {                         # check every 100ms for ht
 });
 
 Glib::Timeout->add(1000, sub {                         # check every 1s for mqtt responses
-  while ($mqtt_data_ref = shared_clone($mqtt_q[FROM_THREAD]->dequeue_nb())) {
-    print_error("Received MQTT data");
+  while ($mqtt_data_ref = $mqtt_q[FROM_THREAD]->dequeue_nb()) {
+    #print_error("Received MQTT data");
     if (($mode_display_area == DISPLAY_HA) && (keys %$mqtt_data_ref)) {
       display_home_assistant($mqtt_data_ref, 0);
     }
