@@ -1014,7 +1014,6 @@ sub display_car {
   $valct = $old_values[1];
   $valpi = $old_values[2];
   $valbatt = $old_values[3];
-  $valct = (defined $valct) ? $valct : "--";
   delete_all_children($car_box);
   my $car_slice_box = Gtk3::Box->new('vertical', 0);
   add_style_class($car_slice_box, 'car-slice-box-style');
@@ -1027,7 +1026,11 @@ sub display_car {
   $car_slice_box->pack_start($battery_slice, 0, 0, 0);
   $car_box->pack_start($car_slice_box, 0, 0, 0);
   $valr = int($valr * 5 / 8) . " miles" if defined $valr;
-  $valct = sprintf("%.1f hours", $valct / 60) if defined $valct;
+  if (($valct == 0) || (!defined $valct)) {
+    $valct = "--";
+  } else {
+    $valct = sprintf("%.1f hours", $valct / 60);
+  }
   $valpi = (($valpi eq "off") ? "No" : "Yes") if defined $valpi;
   my $params_box = ha_create_params_box("Range", $valr, "Charge time", $valct, "Plugged in", $valpi);
   $car_box->pack_end($params_box, 0, 0, 0);

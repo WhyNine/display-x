@@ -932,7 +932,7 @@ $pids{"HealthCheck"} = threads->create(sub{                    # ping to healthc
 })->detach();
 
 $pids{"MQTT"} = threads->create(sub{
-  while (!mosquitto_process_running($mqtt_ref->{'server'})) {
+  while (!mosquitto_process_running($mqtt_ref->{'server'})) {   # wait until mosquitto is running
     sleep(5);
   }
   while (1) {            # check for new MQTT messages 30s
