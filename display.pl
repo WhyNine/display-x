@@ -71,17 +71,16 @@ my @transport_buttons_album_pause = ({"icon-filename" => "back", "callback" => \
                                      {"icon-filename" => "next", "callback" => \&album_next_track});
 
 my %pids;
-my $pictures_q : shared;
-$pictures_q = Thread::Queue->new;
 my $pictures_event;
-my $music_event;
-my $backlight_event;
 
 use constant TO_THREAD => 0;
 use constant FROM_THREAD => 1;
-# Note audio_q is defined in Audio.pm
+# Note audio_q and mqtt_q are defined elsewhere
+my $pictures_q : shared;
+$pictures_q = Thread::Queue->new;
 my @http_q : shared;
 @http_q = (Thread::Queue->new, Thread::Queue->new);   # [0] is to send messages to http thread, [1] is to receive messages from http thread
+
 my %callbacks;
 my $num_callbacks;
 my $music_library_key;

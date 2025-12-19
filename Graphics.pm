@@ -980,7 +980,7 @@ sub display_solar {
       $ie_val_str = format_number($vale) . "W";
     }
   } else {
-    $imp_exp_str = "Importing/Exporting";
+    $imp_exp_str = "Import/Export";
     $ie_val_str = "N/A";
   }
   my $cons_str;

@@ -2,7 +2,7 @@ package Gather;
 
 use v5.28;
 
-our @EXPORT = qw ( gather_pictures gather_music call_callback );
+our @EXPORT = qw ( gather_pictures );
 use base qw(Exporter);
 
 use strict;
