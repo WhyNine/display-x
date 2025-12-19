@@ -123,7 +123,7 @@ sub mosquitto_process_running {
 }
 
 sub check_mqtt_subscribed {
-  my $online = (my $server = 'mqtt_server_address()');
+  my $online = (my $server = mqtt_server_address());
   while (!$online) {
     print_error("Unable to ping MQTT server " . $mqtt_ref->{'server'});
     $mqtt_instance->disconnect() if $mqtt_instance;
