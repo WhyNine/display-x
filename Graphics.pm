@@ -219,11 +219,11 @@ sub init_fb {
   add_style_class($header_container, 'header-footer-style');
   $vbox->pack_start($header_container, 0, 0, 0);            # Place at the top of the window
   $main_area = Gtk3::Box->new('vertical', 0);
-  $main_area->signal_connect('size-allocate' => sub {
-    my ($widget, $allocation) = @_;
-    return if ($widget->get_allocated_width == 722) && ($widget->get_allocated_height == 1032);
-    print_error("Main area resized to " . $widget->get_allocated_width . "x" . $widget->get_allocated_height);
-  });
+  #$main_area->signal_connect('size-allocate' => sub {
+  #  my ($widget, $allocation) = @_;
+  #  return if ($widget->get_allocated_width == 722) && ($widget->get_allocated_height == 1032);
+  #  print_error("Main area resized to " . $widget->get_allocated_width . "x" . $widget->get_allocated_height);
+  #});
   $vbox->pack_start($main_area, 1, 0, 0);                   # Place at the top of the window taking rest of space
   $footer_container = Gtk3::Box->new('vertical', 0);        # Vertical box for the footer buttons
   add_style_class($footer_container, 'header-footer-style');

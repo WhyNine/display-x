@@ -540,6 +540,10 @@ sub gather_music {
   }
   print_error("Start gathering music");
   %thumbnails = ();
+  %artists_by_letter = ();
+  %artists_by_id = ();
+  %album_id_to_artist_id = ();
+  %playlists = ();
   get_json("/Library/MediaFolders", sub {parse_error() if !process_library_sections(@_);});
 }
 
@@ -982,8 +986,11 @@ Glib::Timeout->add(100, sub {                         # check every 100ms for ht
 });
 
 Glib::Timeout->add(1000, sub {                         # check every 1s for mqtt responses
-  while ($mqtt_data_ref = $mqtt_q[FROM_THREAD]->dequeue_nb()) {
+  my $ref;
+  while ($ref = $mqtt_q[FROM_THREAD]->dequeue_nb()) {
     #print_error("Received MQTT data");
+    $mqtt_data_ref = $ref;
+    #print_hash_params($mqtt_data_ref);
     if (($mode_display_area == DISPLAY_HA) && (keys %$mqtt_data_ref)) {
       display_home_assistant($mqtt_data_ref, 0);
     }
