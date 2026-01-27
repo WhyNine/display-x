@@ -2,6 +2,7 @@ package Graphics;
 
 use v5.28;
 use strict;
+use utf8;
 
 our @EXPORT = qw ( init_fb clear_screen display_photo display_string display_albums_top display_albums_with_letter display_playing_album display_playlists_top display_playing_playlist 
   print_transport_icons display_artists_top display_artists_with_letter display_artist_albums_with_letter display_radio_top display_playing_radio print_heading print_footer display_playing_radio_details 
@@ -131,7 +132,7 @@ sub construct_horizontal_separator {
 
 sub display_string {
   my ($str) = @_;
-  print_error("Displaying string: $str");
+  #print_error("Displaying string: $str");
   delete_first_child($main_area);
   my $text_box = Gtk3::Label->new($str);
   add_style_class($text_box, 'display-string-style');
@@ -549,7 +550,7 @@ sub display_radio_top {
 # Args: radio label, ref to stations, ref to transport buttons
 sub display_playing_radio {
   my ($label, $radio_stations_ref, $transport_buttons_ref) = @_;
-  print_error("Playing radio $label");
+  #print_error("Playing radio $label");
   my $playing_box = clear_play_area();
   if ($full_playing_area) {
     my $fname = $radio_stations_ref->{$label}->{"icon"};
@@ -637,7 +638,7 @@ sub display_playing_playlist {
 # Args: ref to playlists hash, callback
 sub display_playlists_top {
   my ($ref_playlists, $callback) = @_;
-  print_error("Displaying playlists top");
+  #print_error("Displaying playlists top");
   sub sort_playlists_by_name { return $$ref_playlists{$a}->{"name"} cmp $$ref_playlists{$b}->{"name"}; }
   if (defined $ref_playlists) {
     delete_first_child($main_area);
@@ -1072,7 +1073,7 @@ sub display_printer {
 sub display_home_assistant {
   my ($data_ref, $force_display) = @_;
   my $top_box;
-  print_error("display home assistant");
+  #print_error("display home assistant");
   #print_hash_params($data_ref);
   my $solar_box = display_solar($data_ref, $force_display);
   my $car_box = display_car($data_ref, $force_display);

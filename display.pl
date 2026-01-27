@@ -2,6 +2,7 @@
 
 use strict;
 use v5.28;
+use utf8;
 
 use lib "/home/pi/display";
 use Gather;
@@ -25,6 +26,7 @@ my $jellyfin_user_id;
 my $pictures;           # ref to array of paths
 my $mqtt_data_ref : shared;      # ref to hash of MQTT data
 
+use constant RandomChar => "»";
 use constant PLAYING_NOTHING => 0;
 use constant PLAYING_RADIO => 1;
 use constant PLAYING_PLAYLIST => 2;
@@ -69,6 +71,13 @@ my @transport_buttons_album_pause = ({"icon-filename" => "back", "callback" => \
                                      {"icon-filename" => "stop", "callback" => \&transport_stop}, 
                                      {"icon-filename" => "pause", "callback" => \&transport_pause}, 
                                      {"icon-filename" => "next", "callback" => \&album_next_track});
+
+my @transport_buttons_random_album_play = ({"icon-filename" => "stop", "callback" => \&transport_stop}, 
+                                           {"icon-filename" => "play", "callback" => \&transport_play}, 
+                                           {"icon-filename" => "next", "callback" => \&album_next_random});
+my @transport_buttons_random_album_pause = ({"icon-filename" => "stop", "callback" => \&transport_stop}, 
+                                            {"icon-filename" => "pause", "callback" => \&transport_pause}, 
+                                            {"icon-filename" => "next", "callback" => \&album_next_random});
 
 my %pids;
 my $pictures_event;
@@ -548,7 +557,7 @@ sub gather_music {
 }
 
 sub compile_list_of_albums {
-  %tmp_albums_by_letter = ();
+  %tmp_albums_by_letter = (RandomChar => []);                        # random album play  placholder character
   print_error("Starting album compilation");
   foreach my $artist_letter (keys %artists_by_letter) {
     my %hash1 = %{$artists_by_letter{$artist_letter}};
@@ -642,7 +651,7 @@ sub update_radio_playing {
 sub play_radio {
   my ($input) = @_;
   stop_all_audio();
-  print_error("play radio $input");
+  #print_error("play radio $input");
   $audio_q[TO_THREAD]->enqueue(shared_clone({"command" => "play", "path" => $radio_stations_ref->{$input}->{"url"}}));
   set_play_mode(PLAYING_RADIO);
   $playing_params[PLAYING_RADIO]->{"station"} = $input;
@@ -716,14 +725,23 @@ sub display_albums_by_icon {
   #print_error("display albums with letter $input");
   $input = $displaying_params[DISPLAY_ALBUMS_ICON]->{"input"} unless $input;
   $displaying_params[DISPLAY_ALBUMS_ICON]->{"input"} = $input;                 # remember letter we are displaying
-  set_display_mode(DISPLAY_ALBUMS_ICON);
-  display_albums_with_letter($albums_by_letter{$input}, \&play_album);
+  if ($input eq RandomChar) {                                                         # random album play
+    play_album(RandomChar);
+  } else {
+    set_display_mode(DISPLAY_ALBUMS_ICON);
+    display_albums_with_letter($albums_by_letter{$input}, \&play_album);
+  }
 }
 
 sub update_album_playing {
   #print_error("update album playing");
   set_play_mode(PLAYING_ALBUM);
-  my $transports_ref = ($playing_params[PLAYING_ALBUM]->{"paused"} == 0) ? \@transport_buttons_album_pause : \@transport_buttons_album_play;
+  my $transports_ref;
+  if ($displaying_params[DISPLAY_ALBUMS_ICON]->{"input"} eq RandomChar) {
+    $transports_ref = ($playing_params[PLAYING_ALBUM]->{"paused"} == 0) ? \@transport_buttons_random_album_pause : \@transport_buttons_random_album_play;
+  } else {
+    $transports_ref = ($playing_params[PLAYING_ALBUM]->{"paused"} == 0) ? \@transport_buttons_album_pause : \@transport_buttons_album_play;
+  }
   display_playing_album($playing_params[PLAYING_ALBUM]->{"album_ref"}, $playing_params[PLAYING_ALBUM]->{"track"}, $transports_ref);
 }
 
@@ -731,32 +749,45 @@ sub play_album {
   my ($input) = shift;
   stop_all_audio();
   print_error("play $input");
-  # need to look through albums_by_letter to find match with $input
   my $album_ref;
-  foreach my $letter (keys %albums_by_letter) {
-    my @albums = @{$albums_by_letter{$letter}};
-    foreach my $ref (@albums) {
-      my $tracks_ref = $$ref{"tracks"};
-      if ($input eq construct_album_uid($ref)) {
-        $album_ref = $ref;
-        last;
+  if ($input eq RandomChar) {                       # random album play
+    my @all_albums;
+    foreach my $letter (keys %albums_by_letter) {
+      my @albums = @{$albums_by_letter{$letter}};
+      foreach my $ref (@albums) {
+        push(@all_albums, $ref);
       }
     }
-    last if $album_ref;
-  }
-  unless ($album_ref) {
-    print_error("oops, can't find album uid $input");
-    display_slideshow();
-    return;
+    if (scalar @all_albums == 0) {
+      print_error("oops, can't find any albums for random play");
+      display_slideshow();
+      return;
+    }
+    $album_ref = $all_albums[int(rand(scalar @all_albums))];
+  } else {
+    # need to look through albums_by_letter to find match with $input
+    foreach my $letter (keys %albums_by_letter) {
+      my @albums = @{$albums_by_letter{$letter}};
+      foreach my $ref (@albums) {
+        #my $tracks_ref = $$ref{"tracks"};
+        if ($input eq construct_album_uid($ref)) {
+          $album_ref = $ref;
+          last;
+        }
+      }
+      last if $album_ref;
+    }
+    unless ($album_ref) {
+      print_error("oops, can't find album uid $input");
+      display_slideshow();
+      return;
+    }
   }
   $playing_params[PLAYING_ALBUM]->{"album_ref"} = $album_ref;                         # remember the album we are playing
   my @tracks = sort numeric_sort keys %{$album_ref->{"tracks"}};
-  #print_error("Tracks in album: @tracks");
   my @paths;
   foreach my $i (@tracks) {
-    #print_error($album_ref->{"tracks"}->{$i}->{"id"} . ", " . $album_ref->{"tracks"}->{$i}->{"title"});
     my $p = "$jellyfin_url/Items/" . $album_ref->{"tracks"}->{$i}->{"id"} . "/Download?ApiKey=$jellyfin_apikey";
-    #print_error("Adding track $i: $p");
     $paths[$i] = $p;
   }
   $playing_params[PLAYING_ALBUM]->{"paths_array_ref"} = \@paths;                      # remember the tracks we are playing (note that not all array entries are used)
@@ -767,8 +798,6 @@ sub play_album {
   }
   delete $playing_params[PLAYING_ALBUM]->{"track"};
   foreach my $i (0 .. scalar @paths - 1) {            # find first track
-    #my $track_url = $album_ref->{"tracks"}->{$tracks[0]}->{"url"};
-    #print_error("track url $track_url");
     my $p = $paths[$i];
     if ($p) {
       $playing_params[PLAYING_ALBUM]->{"track"} = $i;                                 # remember the track we are playing
@@ -777,7 +806,11 @@ sub play_album {
   }
   $audio_q[TO_THREAD]->enqueue(shared_clone({"command" => "play", "path" => $playing_params[PLAYING_ALBUM]->{"paths_array_ref"}->[$playing_params[PLAYING_ALBUM]->{"track"}]}));
   $playing_params[PLAYING_ALBUM]->{"paused"} = 0;
-  update_album_playing();
+  update_album_playing($input eq RandomChar);
+}
+
+sub album_next_random {
+  play_album(RandomChar);
 }
 
 sub album_prev_track {

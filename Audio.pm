@@ -39,7 +39,7 @@ sub audio_state {
 }
 
 sub audio_init {
-  print_error("audio init");
+  #print_error("audio init");
   my $pulse = `pulseaudio --start`;
   new_player();
   Glib::Source->remove($message_poll) if $message_poll;
@@ -55,12 +55,12 @@ sub audio_init {
 
 sub new_player {
   $player = new Audio::Play::MPG123;
-  print_error("audio initialised ok") if $player;
+  #print_error("audio initialised ok") if $player;
   print_error("audio initialised fail") unless $player;
 }
 
 sub audio_stop {
-  print_error("audio stop");
+  #print_error("audio stop");
   $player->stop() if $player;
   $polling = 0;
 }
@@ -73,7 +73,7 @@ sub audio_play {
   audio_stop();
   new_player();
   if ($path =~ /^http/ and $path !~ /$jellyfin_url/) {
-    print_error("playing stream audio from $path");
+    #print_error("playing stream audio from $path");
     $vlc_playing = 1;
     my $vlc = `cvlc --no-video $path`;
     $vlc_playing = 0;
@@ -83,7 +83,7 @@ sub audio_play {
       if (!$player->load($path)) {
         print_error("Unable to start playing track at $path");
       } else {
-        print_error("Started playing music");
+        #print_error("Started playing music");
       }
     } else {
       my ($filename, $folder, $suffix) = fileparse($path);
@@ -91,7 +91,7 @@ sub audio_play {
       if (!$player->load($filename)) {
         print_error("Unable to start playing track at $path");
       } else {
-        print_error("Started playing music");
+        #print_error("Started playing music");
       }
     }
     $polling = 1;
