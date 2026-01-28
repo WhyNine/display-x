@@ -557,7 +557,7 @@ sub gather_music {
 }
 
 sub compile_list_of_albums {
-  %tmp_albums_by_letter = (RandomChar => []);                        # random album play  placholder character
+  %tmp_albums_by_letter = (RandomChar, []);                        # random album play  placholder character
   print_error("Starting album compilation");
   foreach my $artist_letter (keys %artists_by_letter) {
     my %hash1 = %{$artists_by_letter{$artist_letter}};
@@ -846,6 +846,10 @@ sub album_next_track {
   if ($playing_params[PLAYING_ALBUM]->{"track"}) {                       # if we found another track to play
     $audio_q[TO_THREAD]->enqueue(shared_clone({"command" => "play", "path" => $playing_params[PLAYING_ALBUM]->{"paths_array_ref"}->[$playing_params[PLAYING_ALBUM]->{"track"}]}));
     update_album_playing();
+  } else {
+    if ($displaying_params[DISPLAY_ALBUMS_ICON]->{"input"} eq RandomChar) {
+      play_album(RandomChar);
+    }
   }
 }
 
