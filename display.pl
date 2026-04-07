@@ -517,7 +517,7 @@ sub extract_jellyfin_user_id {
   my ($json, $ok, $url) = @_;
   if (! $ok) {
     print_error("Unable to GET $url");
-    return;
+    return 0;
   }
   my $ref = $json;
   return unless check_array($ref);
@@ -529,11 +529,12 @@ sub extract_jellyfin_user_id {
 sub find_jellyfin_user_id {
   my $cb = shift;
   get_json("/Users", sub{
+    my $delay = 0;
     if (!extract_jellyfin_user_id(@_)) {
       parse_error();
-      sleep(60);
+      $delay = 60000;
     }
-    &$cb();
+    Glib::Timeout->add($delay, sub {&$cb();});        # either do immediately or wait 60s
   });
 }
 

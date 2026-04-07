@@ -377,6 +377,7 @@ sub display_playing_text {
   my $tbox2 = Gtk3::Label->new($line2);
   add_style_class($tbox2, 'playing-text-style');
   $tbox2->set_halign('center');
+  $tbox2->set_ellipsize('end');                             # use ... if text too long
   $vbox->pack_start($tbox2, 0, 0, 0);
   add_style_class($vbox, 'playing-text-box-style');
   $box->pack_start($vbox, 1, 1, 0);

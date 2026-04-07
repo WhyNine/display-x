@@ -95,6 +95,7 @@ scrolledwindow {
 
 .half-main-area-style {
   min-height: 515px;
+  margin-bottom: 10px;
 }
 
 /* playing area below photo, was 230px */
