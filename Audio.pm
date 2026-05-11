@@ -11,18 +11,18 @@ use lib "/home/pi/display";
 use Utils;
 use UserDetails qw ( $jellyfin_url );
 
-use Audio::Play::MPG123;
-use File::Basename;
 use threads;
 use threads::shared;
 use Thread::Queue;
+use Audio::Play::MPG123;
+use File::Basename;
 
 my $player;
 my $vlc_playing = 0;
 my $message_poll;
 my $polling = 0;
 
-our @audio_q : shared;
+our @audio_q;
 @audio_q = (Thread::Queue->new, Thread::Queue->new);  # to/from queues for audio messages (to = to audio thread, from = from audio thread)
 
 sub player_poll {
@@ -31,7 +31,7 @@ sub player_poll {
 
 # 0 = idle, 2 = playing
 sub audio_state {
-  #print_error("audio state = " . $player->state()) if $player;
+  print_error("audio state = " . $player->state()) if $player;
   #print_error("vlc playing") if $vlc_playing;
   return 2 if $vlc_playing;
   return $player->state() if $player;

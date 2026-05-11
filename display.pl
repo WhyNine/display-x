@@ -13,13 +13,13 @@ use Http;
 use Audio;
 use MQTT;
 
+use threads;
+use threads::shared;
+use Thread::Queue;                # Note always need threads before Thread::Queue
 use Gtk3 -init;
 use Glib;
 use Cairo;
 use JSON::Parse;
-use threads;
-use threads::shared;
-use Thread::Queue;                # Note always need threads before Thread::Queue
 use Furl;
 
 my $jellyfin_user_id;
@@ -85,9 +85,9 @@ my $pictures_event;
 use constant TO_THREAD => 0;
 use constant FROM_THREAD => 1;
 # Note audio_q and mqtt_q are defined elsewhere
-my $pictures_q : shared;
+my $pictures_q;
 $pictures_q = Thread::Queue->new;
-my @http_q : shared;
+my @http_q;
 @http_q = (Thread::Queue->new, Thread::Queue->new);   # [0] is to send messages to http thread, [1] is to receive messages from http thread
 
 my %callbacks;
@@ -983,20 +983,27 @@ $pids{"MQTT"} = threads->create(sub{
   };
 })->detach();
 
-Glib::Timeout->add(500, sub {                         # check every 500ms for new pictures list
-  if (my $pics_ref = $pictures_q->dequeue_nb()) {
+Glib::Timeout->add(100, sub {
+  if (my $pics_ref = $pictures_q->dequeue_nb()) {               # check for new pictures list
     $pictures = $pics_ref;
     print_error("Received pictures list with " . scalar(@$pics_ref) . " pictures");
   }
-  return 1;                 # Continue the timeout
-});
-
-Glib::Timeout->add(200, sub {                         # check every 200ms for audio messages
-  if (my $message = $audio_q[1]->dequeue_nb()) {
+  if (my $message = $audio_q[FROM_THREAD]->dequeue_nb()) {      # check for audio messages
     if ($message eq "play_stopped") {
       print_error("play stopped, mode = $mode_playing_area");
       album_next_track() if $mode_playing_area == PLAYING_ALBUM;
       playlist_next_track() if $mode_playing_area == PLAYING_PLAYLIST;
+    }
+  }
+  while (my $response_ref = $http_q[FROM_THREAD]->dequeue_nb()) {     # check for all http responses
+    call_callback($response_ref);
+  }
+  my $ref;
+  while ($ref = $mqtt_q[FROM_THREAD]->dequeue_nb()) {                 # check for all mqtt messages
+    #print_error("Received MQTT data");
+    $mqtt_data_ref = $ref;
+    if (($mode_display_area == DISPLAY_HA) && (keys %$mqtt_data_ref)) {
+      display_home_assistant($mqtt_data_ref, 0);
     }
   }
   return 1;                 # Continue the timeout
@@ -1014,26 +1021,6 @@ Glib::Timeout->add(100, sub {                         # check every 24hrs at mid
     return 0;
   });
   return 0;
-});
-
-Glib::Timeout->add(100, sub {                         # check every 100ms for http responses
-  while (my $response_ref = $http_q[FROM_THREAD]->dequeue_nb()) {
-    call_callback($response_ref);
-  }
-  return 1;                 # Continue the timeout
-});
-
-Glib::Timeout->add(1000, sub {                         # check every 1s for mqtt responses
-  my $ref;
-  while ($ref = $mqtt_q[FROM_THREAD]->dequeue_nb()) {
-    #print_error("Received MQTT data");
-    $mqtt_data_ref = $ref;
-    #print_hash_params($mqtt_data_ref);
-    if (($mode_display_area == DISPLAY_HA) && (keys %$mqtt_data_ref)) {
-      display_home_assistant($mqtt_data_ref, 0);
-    }
-  }
-  return 1;                 # Continue the timeout
 });
 
 Glib::Timeout->add(60 * 10 * 1000, sub {              # check every 10mins, turn display on/off depending on yaml schedule

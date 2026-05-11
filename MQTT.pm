@@ -25,7 +25,7 @@ my %data;
 my @topics;
 my $mqtt_instance;
 my $subscribed;
-our @mqtt_q : shared;
+our @mqtt_q;
 @mqtt_q = (Thread::Queue->new, Thread::Queue->new);  # to/from queues for mqtt messages (to = to audio thread, from = from audio thread)
 
 sub return_car_battery {
