@@ -31,7 +31,7 @@ sub player_poll {
 
 # 0 = idle, 2 = playing
 sub audio_state {
-  print_error("audio state = " . $player->state()) if $player;
+  #print_error("audio state = " . $player->state()) if $player;
   #print_error("vlc playing") if $vlc_playing;
   return 2 if $vlc_playing;
   return $player->state() if $player;

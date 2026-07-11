@@ -10,6 +10,15 @@ use strict;
 use lib "/home/pi/display";
 use Utils;
 
+sub write_photo_index {
+  my ($ref, $path_to_photo_index) = @_;
+  open(my $fh, ">", $path_to_photo_index) || die "Problem writing to $path_to_photo_index";
+  print $fh scalar(@{$ref}) . "\n";
+  foreach my $pic (@{$ref}) {
+    print $fh "$pic\n";
+  }
+  close($fh);
+}
 
 sub gather_pictures {
   my $path = shift;

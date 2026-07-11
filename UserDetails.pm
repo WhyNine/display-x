@@ -1,6 +1,6 @@
 package UserDetails;
 
-our @EXPORT = qw ( $path_to_pictures $health_check_url $radio_stations_ref $jellyfin_url $jellyfin_apikey $mqtt_ref $display_times_ref);
+our @EXPORT = qw ( $path_to_pictures $health_check_url $radio_stations_ref $jellyfin_url $jellyfin_apikey $mqtt_ref $display_times_ref $path_to_photo_index);
 use base qw(Exporter);
 use strict;
 
@@ -17,6 +17,8 @@ my %settings = %$hash;
 
 our $path_to_pictures = $settings{"picture-path"};
 print_error("Path to pictures does not exist: $path_to_pictures") unless -e $path_to_pictures;
+
+our $path_to_photo_index = $settings{"picture-index"};
 
 our $jellyfin_url = $settings{"jellyfin-url"};
 print_error("No JellyFin URL provided") unless $jellyfin_url;

@@ -7,7 +7,7 @@ use utf8;
 use lib "/home/pi/display";
 use Gather;
 use Graphics;
-use UserDetails qw ( $path_to_pictures $health_check_url $radio_stations_ref $jellyfin_url $jellyfin_apikey $display_times_ref $mqtt_ref );
+use UserDetails qw ( $path_to_pictures $health_check_url $radio_stations_ref $jellyfin_url $jellyfin_apikey $display_times_ref $mqtt_ref $path_to_photo_index);
 use Utils;
 use Http;
 use Audio;
@@ -899,8 +899,11 @@ set_display_mode(DISPLAY_SLIDESHOW);
 $pids{"GatherPictures"} = threads->create(sub {
   while (1) {
     print_error("Starting gathering pictures");
-    $pictures_q->enqueue(shared_clone(Gather::gather_pictures($path_to_pictures)));
+    my $ref = shared_clone(Gather::gather_pictures($path_to_pictures));
+    $pictures_q->enqueue($ref);
     print_error("Finishing gathering pictures");
+    Gather::write_photo_index($ref, $path_to_photo_index);
+    print_error("Photo index updated");
     sleep 60 * 60 * 24; # once a day
   };
 })->detach();
